@@ -35,7 +35,7 @@
 
 #include <websocketpp/extensions/extension.hpp>
 
-#include "zlib.h"
+#include <zlib.h>
 
 #include <algorithm>
 #include <string>
@@ -466,13 +466,13 @@ public:
 
         http::attribute_list::const_iterator it;
         for (it = offer.begin(); it != offer.end(); ++it) {
-            if (it->first == "s2c_no_context_takeover") {
+            if (it->first == "server_no_context_takeover") {
                 negotiate_s2c_no_context_takeover(it->second,ret.first);
-            } else if (it->first == "c2s_no_context_takeover") {
+            } else if (it->first == "client_no_context_takeover") {
                 negotiate_c2s_no_context_takeover(it->second,ret.first);
-            } else if (it->first == "s2c_max_window_bits") {
+            } else if (it->first == "server_max_window_bits") {
                 negotiate_s2c_max_window_bits(it->second,ret.first);
-            } else if (it->first == "c2s_max_window_bits") {
+            } else if (it->first == "client_max_window_bits") {
                 negotiate_c2s_max_window_bits(it->second,ret.first);
             } else {
                 ret.first = make_error_code(error::invalid_attributes);
