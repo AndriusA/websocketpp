@@ -127,6 +127,7 @@ public:
                         // Note: this list will need commas if WebSocket++ ever
                         // supports more than one extension
                         ret.second += neg_ret.second;
+                        m_permessage_deflate.init(base::m_server);
                         continue;
                     }
                 }
@@ -404,15 +405,10 @@ public:
                 // If this was the last frame in the message set the ready flag.
                 // Otherwise, reset processor state to read additional frames.
                 if (frame::get_fin(m_basic_header)) {
-                    // ensure that text messages end on a valid UTF8 code point
-                    if (frame::get_opcode(m_basic_header) == frame::opcode::TEXT) {
-                        if (!m_current_msg->validator.complete()) {
-                            ec = make_error_code(error::invalid_utf8);
-                            break;
-                        }
+                    ec = finalize_message();
+                    if (ec) {
+                        break;
                     }
-
-                    m_state = READY;
                 } else {
                     this->reset_headers();
                 }
@@ -424,6 +420,44 @@ public:
         }
 
         return p;
+    }
+
+    /// Perform any finalization actions on an incoming message
+    /**
+     * Called after the full message is received. Provides the opportunity for
+     * extensions to complete any data post processing as well as final UTF8
+     * validation checks for text messages.
+     *
+     * @return A code indicating errors, if any
+     */
+    lib::error_code finalize_message() {
+        std::string & out = m_current_msg->msg_ptr->get_raw_payload();
+
+        // if the frame is compressed, append the compression
+        // trailer and flush the compression buffer.
+        if (m_permessage_deflate.is_enabled()
+            && frame::get_rsv1(m_basic_header))
+        {
+            uint8_t trailer[4] = {0x00, 0x00, 0xff, 0xff};
+
+            // Decompress current buffer into the message buffer
+            lib::error_code ec;
+            ec = m_permessage_deflate.decompress(trailer,4,out);
+            if (ec) {
+                return ec;
+            }
+        }
+
+        // ensure that text messages end on a valid UTF8 code point
+        if (frame::get_opcode(m_basic_header) == frame::opcode::TEXT) {
+            if (!m_current_msg->validator.complete()) {
+                return make_error_code(error::invalid_utf8);
+            }
+        }
+
+        m_state = READY;
+
+        return lib::error_code();
     }
 
     void reset_headers() {
@@ -523,24 +557,25 @@ public:
                           && in->get_compressed();
         bool fin = in->get_fin();
 
-        // generate header
-        frame::basic_header h(op,i.size(),fin,masked,compressed);
-
         if (masked) {
             // Generate masking key.
             key.i = m_rng();
-
-            frame::extended_header e(i.size(),key.i);
-            out->set_header(frame::prepare_header(h,e));
         } else {
-            frame::extended_header e(i.size());
-            out->set_header(frame::prepare_header(h,e));
+            key.i = 0;
         }
 
         // prepare payload
         if (compressed) {
             // compress and store in o after header.
             m_permessage_deflate.compress(i,o);
+
+            if (o.size() < 4) {
+                return make_error_code(error::general);
+            }
+
+            // Strip trailing 4 0x00 0x00 0xff 0xff bytes before writing to the
+            // wire
+            o.resize(o.size()-4);
 
             // mask in place if necessary
             if (masked) {
@@ -558,6 +593,17 @@ public:
             } else {
                 std::copy(i.begin(),i.end(),o.begin());
             }
+        }
+
+        // generate header
+        frame::basic_header h(op,o.size(),fin,masked,compressed);
+
+        if (masked) {
+            frame::extended_header e(o.size(),key.i);
+            out->set_header(frame::prepare_header(h,e));
+        } else {
+            frame::extended_header e(o.size());
+            out->set_header(frame::prepare_header(h,e));
         }
 
         out->set_prepared(true);
@@ -704,7 +750,10 @@ protected:
             && frame::get_rsv1(m_basic_header))
         {
             // Decompress current buffer into the message buffer
-            m_permessage_deflate.decompress(buf,len,out);
+            ec = m_permessage_deflate.decompress(buf,len,out);
+            if (ec) {
+                return 0;
+            }
 
             // get the length of the newly uncompressed output
             offset = out.size() - offset;
