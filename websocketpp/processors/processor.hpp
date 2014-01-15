@@ -183,7 +183,11 @@ public:
      * requested extensions are supported by this processor. If they are their
      * settings data is initialized.
      */
-    virtual err_str_pair negotiate_extensions(request_type const & request) {
+    virtual err_str_pair negotiate_extensions_request(request_type const & request) {
+        return err_str_pair();
+    }
+
+    virtual err_str_pair process_extensions_response(response_type const & response) {
         return err_str_pair();
     }
 
@@ -196,7 +200,7 @@ public:
      * @return A status code, 0 on success, non-zero for specific sorts of
      * failure
      */
-    virtual lib::error_code validate_handshake(request_type const & request)
+    virtual lib::error_code validate_handshake_request(request_type const & request)
         const = 0;
 
     /// Calculate the appropriate response for this websocket request
@@ -209,7 +213,7 @@ public:
      *
      * @return An error code, 0 on success, non-zero for other errors
      */
-    virtual lib::error_code process_handshake(request_type const & req,
+    virtual lib::error_code process_handshake_request(request_type const & req,
         std::string const & subprotocol, response_type& res) const = 0;
 
     /// Fill in an HTTP request for an outgoing connection handshake

@@ -6,6 +6,20 @@
 // is configured.
 #include <websocketpp/common/thread.hpp>
 
+#include <websocketpp/extensions/permessage_deflate/enabled.hpp>
+
+struct deflate_config : public websocketpp::config::asio_client {
+    typedef deflate_config type;
+    /// permessage_compress extension
+    struct permessage_deflate_conf : type::permessage_deflate_config{
+        static const uint8_t minimum_outgoing_window_bits = 12;
+        static const bool allow_disabling_context_takeover = true;
+        static const bool no_context_takeover = true;
+    };
+    typedef websocketpp::extensions::permessage_deflate::enabled
+        <permessage_deflate_conf> permessage_deflate_type;
+};
+
 /**
  * The telemetry client connects to a WebSocket server and sends a message every
  * second containing an integer count. This example can be used as the basis for
@@ -14,15 +28,15 @@
  */
 class telemetry_client {
 public:
-    typedef websocketpp::client<websocketpp::config::asio_client> client;
+    typedef websocketpp::client<deflate_config> client;
     typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
 
     telemetry_client() : m_open(false),m_done(false) {
         // set up access channels to only log interesting things
-        m_client.clear_access_channels(websocketpp::log::alevel::all);
-        m_client.set_access_channels(websocketpp::log::alevel::connect);
-        m_client.set_access_channels(websocketpp::log::alevel::disconnect);
-        m_client.set_access_channels(websocketpp::log::alevel::app);
+        m_client.set_access_channels(websocketpp::log::alevel::all | websocketpp::log::alevel::debug_handshake );
+        //m_client.set_access_channels(websocketpp::log::alevel::connect);
+        //m_client.set_access_channels(websocketpp::log::alevel::disconnect);
+        //m_client.set_access_channels(websocketpp::log::alevel::app);
 
         // Initialize the Asio transport policy
         m_client.init_asio();
@@ -117,6 +131,7 @@ public:
 
             val.str("");
             val << "count is " << count++;
+            val.str("this is a fixed message");
 
             m_client.get_alog().write(websocketpp::log::alevel::app, val.str());
             m_client.send(m_hdl,val.str(),websocketpp::frame::opcode::text,ec);

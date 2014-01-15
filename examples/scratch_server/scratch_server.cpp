@@ -40,12 +40,9 @@ struct deflate_config : public websocketpp::config::debug_core {
 
     typedef websocketpp::transport::asio::endpoint<transport_config> 
         transport_type;
-        
-    /// permessage_compress extension
-    struct permessage_deflate_config {};
 
     typedef websocketpp::extensions::permessage_deflate::enabled
-        <permessage_deflate_config> permessage_deflate_type;
+        <type::permessage_deflate_config> permessage_deflate_type;
 };
 
 typedef websocketpp::server<deflate_config> server;

@@ -55,6 +55,13 @@ struct stub_config {
 
     struct permessage_deflate_config {
         typedef stub_config::request_type request_type;
+        static const uint8_t cliemt_min_window_bits = 8;
+        static const uint8_t server_min_window_bits = 8;
+        static const uint8_t server_max_window_bits = 15;
+        static const uint8_t client_max_window_bits = 15;
+        static const bool allow_disabling_context_takeover = true;
+        static const bool client_no_context_takeover = false;
+        static const bool server_no_context_takeover = false;
     };
 
     typedef websocketpp::extensions::permessage_deflate::disabled
@@ -76,6 +83,13 @@ struct stub_config_ext {
 
     struct permessage_deflate_config {
         typedef stub_config_ext::request_type request_type;
+        static const uint8_t cliemt_min_window_bits = 8;
+        static const uint8_t server_min_window_bits = 8;
+        static const uint8_t server_max_window_bits = 15;
+        static const uint8_t client_max_window_bits = 15;
+        static const bool allow_disabling_context_takeover = true;
+        static const bool client_no_context_takeover = false;
+        static const bool server_no_context_takeover = false;
     };
 
     typedef websocketpp::extensions::permessage_deflate::enabled
@@ -124,7 +138,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK(!env.p.validate_handshake(env.req));
+    BOOST_CHECK(!env.p.validate_handshake_request(env.req));
 
     websocketpp::uri_ptr u;
 
@@ -135,7 +149,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
     BOOST_CHECK_EQUAL(u->get_resource(), "/");
     BOOST_CHECK_EQUAL(u->get_port(), websocketpp::uri_default_port);
 
-    env.p.process_handshake(env.req,"",env.res);
+    env.p.process_handshake_request(env.req,"",env.res);
 
     BOOST_CHECK_EQUAL(env.res.get_header("Connection"), "upgrade");
     BOOST_CHECK_EQUAL(env.res.get_header("Upgrade"), "websocket");
@@ -151,7 +165,7 @@ BOOST_AUTO_TEST_CASE( non_get_method ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK( env.p.validate_handshake(env.req) == websocketpp::processor::error::invalid_http_method );
+    BOOST_CHECK( env.p.validate_handshake_request(env.req) == websocketpp::processor::error::invalid_http_method );
 }
 
 BOOST_AUTO_TEST_CASE( old_http_version ) {
@@ -163,7 +177,7 @@ BOOST_AUTO_TEST_CASE( old_http_version ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::invalid_http_version );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::invalid_http_version );
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
@@ -175,7 +189,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
 
     BOOST_CHECK( websocketpp::processor::is_websocket_handshake(env.req) );
     BOOST_CHECK_EQUAL( websocketpp::processor::get_websocket_version(env.req), env.p.get_version() );
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::missing_required_header );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::missing_required_header );
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
@@ -187,7 +201,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
 
     BOOST_CHECK( websocketpp::processor::is_websocket_handshake(env.req) );
     BOOST_CHECK_EQUAL( websocketpp::processor::get_websocket_version(env.req), env.p.get_version() );
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::missing_required_header );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::missing_required_header );
 }
 
 BOOST_AUTO_TEST_CASE( bad_host ) {
@@ -199,7 +213,7 @@ BOOST_AUTO_TEST_CASE( bad_host ) {
 
     BOOST_CHECK( websocketpp::processor::is_websocket_handshake(env.req) );
     BOOST_CHECK_EQUAL( websocketpp::processor::get_websocket_version(env.req), env.p.get_version() );
-    BOOST_CHECK( !env.p.validate_handshake(env.req) );
+    BOOST_CHECK( !env.p.validate_handshake_request(env.req) );
     BOOST_CHECK( !env.p.get_uri(env.req)->get_valid() );
 }
 
@@ -575,7 +589,7 @@ BOOST_AUTO_TEST_CASE( extensions_disabled ) {
     env.req.replace_header("Sec-WebSocket-Extensions","");
 
     std::pair<websocketpp::lib::error_code,std::string> neg_results;
-    neg_results = env.p.negotiate_extensions(env.req);
+    neg_results = env.p.negotiate_extensions_request(env.req);
 
     BOOST_CHECK_EQUAL( neg_results.first, websocketpp::processor::error::extensions_disabled );
     BOOST_CHECK_EQUAL( neg_results.second, "" );
@@ -587,7 +601,7 @@ BOOST_AUTO_TEST_CASE( extension_negotiation_blank ) {
     env.req.replace_header("Sec-WebSocket-Extensions","");
 
     std::pair<websocketpp::lib::error_code,std::string> neg_results;
-    neg_results = env.p.negotiate_extensions(env.req);
+    neg_results = env.p.negotiate_extensions_request(env.req);
 
     BOOST_CHECK( !neg_results.first );
     BOOST_CHECK_EQUAL( neg_results.second, "" );
@@ -599,7 +613,7 @@ BOOST_AUTO_TEST_CASE( extension_negotiation_unknown ) {
     env.req.replace_header("Sec-WebSocket-Extensions","foo");
 
     std::pair<websocketpp::lib::error_code,std::string> neg_results;
-    neg_results = env.p.negotiate_extensions(env.req);
+    neg_results = env.p.negotiate_extensions_request(env.req);
 
     BOOST_CHECK( !neg_results.first );
     BOOST_CHECK_EQUAL( neg_results.second, "" );
@@ -650,10 +664,10 @@ BOOST_AUTO_TEST_CASE( extension_negotiation_permessage_deflate ) {
     processor_setup_ext env(true);
 
     env.req.replace_header("Sec-WebSocket-Extensions",
-        "permessage-deflate; c2s_max_window_bits");
+        "permessage-deflate; client_max_window_bits");
 
     std::pair<websocketpp::lib::error_code,std::string> neg_results;
-    neg_results = env.p.negotiate_extensions(env.req);
+    neg_results = env.p.negotiate_extensions_request(env.req);
 
     BOOST_CHECK( !neg_results.first );
     BOOST_CHECK_EQUAL( neg_results.second, "permessage-deflate" );

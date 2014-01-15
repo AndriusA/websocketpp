@@ -84,7 +84,7 @@ public:
         return m_permessage_deflate.is_implemented();
     }
 
-    err_str_pair negotiate_extensions(request_type const & req) {
+    err_str_pair negotiate_extensions_request(request_type const & req) {
         err_str_pair ret;
 
         // Respect blanket disabling of all extensions and don't even parse
@@ -115,7 +115,7 @@ public:
             for (it = p.begin(); it != p.end(); ++it) {
                 // look through each extension, if the key is permessage-deflate
                 if (it->first == "permessage-deflate") {
-                    neg_ret = m_permessage_deflate.negotiate(it->second);
+                    neg_ret = m_permessage_deflate.negotiate_request(it->second);
 
                     if (neg_ret.first) {
                         // Figure out if this is an error that should halt all
@@ -137,7 +137,47 @@ public:
         return ret;
     }
 
-    lib::error_code validate_handshake(request_type const & r) const {
+    err_str_pair process_extensions_response(response_type const & resp) {
+        err_str_pair ret;
+
+        // Assume that extension parameters have been validated already
+        http::parameter_list p;
+        bool error = resp.get_header_as_plist("Sec-WebSocket-Extensions", p);
+
+        if (error) {
+            ret.first = make_error_code(error::extension_parse_error);
+            return ret;
+        }
+
+        if (p.size() == 0) {
+            return ret;
+        }
+
+        http::parameter_list::const_iterator it;
+
+        if (m_permessage_deflate.is_implemented()) {
+            err_str_pair neg_ret;
+            for (it = p.begin(); it != p.end(); ++it) {
+                if (it->first == "permessage-deflate") {
+                    neg_ret = m_permessage_deflate.validate_offer(it->second);
+
+                    // If server response does not validate, close connection
+                    if (neg_ret.first) {
+                        return neg.ret;
+                    } else {
+                        // Note m_server should be FALSE
+                        ret.second += neg_ret.second;
+                        m_permessage_deflate.init(base::m_server);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        return ret;
+    }
+
+    lib::error_code validate_handshake_request(request_type const & r) const {
         if (r.get_method() != "GET") {
             return make_error_code(error::invalid_http_method);
         }
@@ -161,7 +201,7 @@ public:
      * generic struct if other user input parameters to the processed handshake
      * are found.
      */
-    lib::error_code process_handshake(request_type const & request, const
+    lib::error_code process_handshake_request(request_type const & request, const
         std::string & subprotocol, response_type& response) const
     {
         std::string server_key = request.get_header("Sec-WebSocket-Key");
@@ -217,6 +257,12 @@ public:
 
         req.replace_header("Sec-WebSocket-Key",base64_encode(raw_key, 16));
 
+        if (m_permessage_deflate.is_implemented()){
+            err_str_pair off_ret = m_permessage_deflate.generate_offer();
+            if (!off_ret.first)
+                req.replace_header("Sec-WebSocket-Extensions", off_ret.second);
+        }
+
         return lib::error_code();
     }
 
@@ -250,6 +296,30 @@ public:
 
         if (ec || key != res.get_header("Sec-WebSocket-Accept")) {
             return error::make_error_code(error::missing_required_header);
+        }
+
+        // TODO: reject when there are non-offered extensions
+        
+        return lib::error_code();
+    }
+
+    lib::error_code process_handshake_response(request_type const & req, const
+        std::string & subprotocol, response_type& res) const
+    {
+        std::string server_key = req.get_header("Sec-WebSocket-Key");
+
+        lib::error_code ec = process_handshake_key(server_key);
+
+        if (ec) {
+            return ec;
+        }
+
+        res.replace_header("Sec-WebSocket-Accept",server_key);
+        res.append_header("Upgrade",constants::upgrade_token);
+        res.append_header("Connection",constants::connection_token);
+
+        if (!subprotocol.empty()) {
+            res.replace_header("Sec-WebSocket-Protocol",subprotocol);
         }
 
         return lib::error_code();
@@ -554,7 +624,11 @@ public:
         frame::masking_key_type key;
         bool masked = !base::m_server;
         bool compressed = m_permessage_deflate.is_enabled()
-                          && in->get_compressed();
+                          && (in->get_compressed() || out->get_compressed());
+                          
+        std::cout << "Preparing data frame, compressed? " << compressed 
+                  << m_permessage_deflate.is_enabled() << in->get_compressed() 
+                  << out->get_compressed();
         bool fin = in->get_fin();
 
         if (masked) {

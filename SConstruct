@@ -113,7 +113,7 @@ tls_libs = []
 tls_build = False
 
 if env['PLATFORM'] == 'posix':
-   platform_libs = ['pthread', 'rt']
+   platform_libs = ['pthread', 'rt', 'z']
    tls_libs = ['ssl', 'crypto']
    tls_build = True
 elif env['PLATFORM'] == 'darwin':

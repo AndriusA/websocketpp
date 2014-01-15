@@ -30,6 +30,7 @@
 
 #include <websocketpp/common/cpp11.hpp>
 #include <websocketpp/common/system_error.hpp>
+#include <websocketpp/error.hpp>
 
 #include <websocketpp/http/constants.hpp>
 #include <websocketpp/extensions/extension.hpp>
@@ -53,7 +54,10 @@ class disabled {
     typedef std::pair<lib::error_code,std::string> err_str_pair;
 
 public:
-    err_str_pair negotiate(http::attribute_list const & attributes) {
+    err_str_pair negotiate_request(http::attribute_list const & attributes) {
+        return make_pair(make_error_code(error::disabled),std::string());
+    }
+    err_str_pair validate_offer(http::attribute_list const & response) {
         return make_pair(make_error_code(error::disabled),std::string());
     }
 
@@ -86,6 +90,12 @@ public:
 
     lib::error_code decompress(std::string const & in, std::string & out) {
         return make_error_code(error::disabled);
+    }
+
+    err_str_pair generate_offer() const {
+        err_str_pair ret;
+        ret.first = make_error_code(error::disabled);
+        return ret;
     }
 };
 

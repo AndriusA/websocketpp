@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(p.validate_handshake(r));
+    BOOST_CHECK(p.validate_handshake_request(r));
 
     websocketpp::uri_ptr u;
     bool exception;
@@ -65,7 +65,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
     BOOST_CHECK(u->get_resource() == "/");
     BOOST_CHECK(u->get_port() == websocketpp::URI_DEFAULT_PORT);
 
-    p.process_handshake(r,response);
+    p.process_handshake_request(r,response);
 
     BOOST_CHECK(response.get_header("Connection") == "Upgrade");
     BOOST_CHECK(response.get_header("Upgrade") == "websocket");
@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE( non_get_method ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(!p.validate_handshake(r));
+    BOOST_CHECK(!p.validate_handshake_request(r));
 }
 
 BOOST_AUTO_TEST_CASE( old_http_version ) {
@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE( old_http_version ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(!p.validate_handshake(r));
+    BOOST_CHECK(!p.validate_handshake_request(r));
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(!p.validate_handshake(r));
+    BOOST_CHECK(!p.validate_handshake_request(r));
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
@@ -128,7 +128,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(!p.validate_handshake(r));
+    BOOST_CHECK(!p.validate_handshake_request(r));
 }
 
 BOOST_AUTO_TEST_CASE( bad_host ) {
@@ -144,7 +144,7 @@ BOOST_AUTO_TEST_CASE( bad_host ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(r));
     BOOST_CHECK(websocketpp::processor::get_websocket_version(r) == p.get_version());
-    BOOST_CHECK(!p.validate_handshake(r));
+    BOOST_CHECK(!p.validate_handshake_request(r));
 
     try {
     	u = p.get_uri(r);

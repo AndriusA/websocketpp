@@ -68,7 +68,7 @@ public:
         return 0;
     }
 
-    lib::error_code validate_handshake(request_type const & r) const {
+    lib::error_code validate_handshake_request(request_type const & r) const {
         if (r.get_method() != "GET") {
             return make_error_code(error::invalid_http_method);
         }
@@ -91,7 +91,7 @@ public:
         return lib::error_code();
     }
 
-    lib::error_code process_handshake(request_type const & req,
+    lib::error_code process_handshake_request(request_type const & req,
         std::string const & subprotocol, response_type & res) const
     {
         char key_final[16];

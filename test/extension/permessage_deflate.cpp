@@ -29,6 +29,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <websocketpp/error.hpp>
+#include <websocketpp/config/core.hpp>
 
 #include <websocketpp/extensions/extension.hpp>
 #include <websocketpp/extensions/permessage_deflate/disabled.hpp>
@@ -39,7 +40,7 @@
 #include <websocketpp/utilities.hpp>
 #include <iostream>
 
-class config {};
+class config : public websocketpp::config::core::permessage_deflate_config {};
 
 typedef websocketpp::extensions::permessage_deflate::enabled<config> enabled_type;
 typedef websocketpp::extensions::permessage_deflate::disabled<config> disabled_type;
@@ -84,7 +85,7 @@ BOOST_AUTO_TEST_CASE( enabled_starts_disabled ) {
 BOOST_AUTO_TEST_CASE( negotiation_empty_attr ) {
     ext_vars v;
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate");
@@ -94,7 +95,7 @@ BOOST_AUTO_TEST_CASE( negotiation_invalid_attr ) {
     ext_vars v;
     v.attr["foo"] = "bar";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( !v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, pmde::make_error_code(pmde::invalid_attributes) );
     BOOST_CHECK_EQUAL( v.esp.second, "");
@@ -105,7 +106,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_no_context_takeover_invalid ) {
     ext_vars v;
     v.attr["server_no_context_takeover"] = "foo";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( !v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, pmde::make_error_code(pmde::invalid_attribute_value) );
     BOOST_CHECK_EQUAL( v.esp.second, "");
@@ -115,7 +116,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_no_context_takeover ) {
     ext_vars v;
     v.attr["server_no_context_takeover"] = "";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover");
@@ -125,7 +126,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_no_context_takeover_server_initiated ) {
     ext_vars v;
 
     v.exts.enable_server_no_context_takeover();
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover");
@@ -136,7 +137,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_no_context_takeover_invalid ) {
     ext_vars v;
     v.attr["client_no_context_takeover"] = "foo";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( !v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, pmde::make_error_code(pmde::invalid_attribute_value) );
     BOOST_CHECK_EQUAL( v.esp.second, "");
@@ -146,7 +147,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_no_context_takeover ) {
     ext_vars v;
     v.attr["client_no_context_takeover"] = "";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_no_context_takeover");
@@ -156,7 +157,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_no_context_takeover_server_initiated ) {
     ext_vars v;
 
     v.exts.enable_client_no_context_takeover();
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_no_context_takeover");
@@ -177,7 +178,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_invalid ) {
     for (it = values.begin(); it != values.end(); ++it) {
         v.attr["server_max_window_bits"] = *it;
 
-        v.esp = v.exts.negotiate(v.attr);
+        v.esp = v.exts.negotiate_request(v.attr);
         BOOST_CHECK( !v.exts.is_enabled() );
         BOOST_CHECK_EQUAL( v.esp.first, pmde::make_error_code(pmde::invalid_attribute_value) );
         BOOST_CHECK_EQUAL( v.esp.second, "");
@@ -188,14 +189,14 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_valid ) {
     ext_vars v;
     v.attr["server_max_window_bits"] = "8";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_max_window_bits=8");
 
     v.attr["server_max_window_bits"] = "15";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate");
@@ -216,7 +217,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_decline ) {
     v.attr["server_max_window_bits"] = "8";
 
     v.ec = v.exts.set_server_max_window_bits(15,pmd_mode::decline);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -228,7 +229,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_accept ) {
     v.attr["server_max_window_bits"] = "8";
 
     v.ec = v.exts.set_server_max_window_bits(15,pmd_mode::accept);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -240,7 +241,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_largest ) {
     v.attr["server_max_window_bits"] = "8";
 
     v.ec = v.exts.set_server_max_window_bits(15,pmd_mode::largest);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -252,7 +253,7 @@ BOOST_AUTO_TEST_CASE( negotiate_server_max_window_bits_smallest ) {
     v.attr["server_max_window_bits"] = "8";
 
     v.ec = v.exts.set_server_max_window_bits(15,pmd_mode::smallest);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -272,7 +273,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_invalid ) {
     for (it = values.begin(); it != values.end(); ++it) {
         v.attr["client_max_window_bits"] = *it;
 
-        v.esp = v.exts.negotiate(v.attr);
+        v.esp = v.exts.negotiate_request(v.attr);
         BOOST_CHECK( !v.exts.is_enabled() );
         BOOST_CHECK_EQUAL( v.esp.first, pmde::make_error_code(pmde::invalid_attribute_value) );
         BOOST_CHECK_EQUAL( v.esp.second, "");
@@ -283,19 +284,19 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_valid ) {
     ext_vars v;
 
     v.attr["client_max_window_bits"] = "";
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate");
 
     v.attr["client_max_window_bits"] = "8";
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_max_window_bits=8");
 
     v.attr["client_max_window_bits"] = "15";
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate");
@@ -316,7 +317,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_decline ) {
     v.attr["client_max_window_bits"] = "8";
 
     v.ec = v.exts.set_client_max_window_bits(8,pmd_mode::decline);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -328,7 +329,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_accept ) {
     v.attr["client_max_window_bits"] = "8";
 
     v.ec = v.exts.set_client_max_window_bits(15,pmd_mode::accept);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -340,7 +341,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_largest ) {
     v.attr["client_max_window_bits"] = "8";
 
     v.ec = v.exts.set_client_max_window_bits(15,pmd_mode::largest);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -352,7 +353,7 @@ BOOST_AUTO_TEST_CASE( negotiate_client_max_window_bits_smallest ) {
     v.attr["client_max_window_bits"] = "8";
 
     v.ec = v.exts.set_client_max_window_bits(15,pmd_mode::smallest);
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.ec, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
@@ -367,7 +368,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated1 ) {
     v.attr["server_no_context_takeover"] = "";
     v.attr["client_no_context_takeover"] = "";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; client_no_context_takeover");
@@ -379,7 +380,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated2 ) {
     v.attr["server_no_context_takeover"] = "";
     v.attr["server_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; server_max_window_bits=10");
@@ -391,7 +392,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated3 ) {
     v.attr["server_no_context_takeover"] = "";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; client_max_window_bits=10");
@@ -403,7 +404,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated4 ) {
     v.attr["client_no_context_takeover"] = "";
     v.attr["server_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_no_context_takeover; server_max_window_bits=10");
@@ -415,7 +416,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated5 ) {
     v.attr["client_no_context_takeover"] = "";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_no_context_takeover; client_max_window_bits=10");
@@ -427,7 +428,7 @@ BOOST_AUTO_TEST_CASE( negotiate_two_client_initiated6 ) {
     v.attr["server_max_window_bits"] = "10";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_max_window_bits=10; client_max_window_bits=10");
@@ -440,7 +441,7 @@ BOOST_AUTO_TEST_CASE( negotiate_three_client_initiated1 ) {
     v.attr["client_no_context_takeover"] = "";
     v.attr["server_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=10");
@@ -453,7 +454,7 @@ BOOST_AUTO_TEST_CASE( negotiate_three_client_initiated2 ) {
     v.attr["client_no_context_takeover"] = "";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; client_no_context_takeover; client_max_window_bits=10");
@@ -466,7 +467,7 @@ BOOST_AUTO_TEST_CASE( negotiate_three_client_initiated3 ) {
     v.attr["server_max_window_bits"] = "10";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; server_max_window_bits=10; client_max_window_bits=10");
@@ -479,7 +480,7 @@ BOOST_AUTO_TEST_CASE( negotiate_three_client_initiated4 ) {
     v.attr["server_max_window_bits"] = "10";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; client_no_context_takeover; server_max_window_bits=10; client_max_window_bits=10");
@@ -493,7 +494,7 @@ BOOST_AUTO_TEST_CASE( negotiate_four_client_initiated ) {
     v.attr["server_max_window_bits"] = "10";
     v.attr["client_max_window_bits"] = "10";
 
-    v.esp = v.exts.negotiate(v.attr);
+    v.esp = v.exts.negotiate_request(v.attr);
     BOOST_CHECK( v.exts.is_enabled() );
     BOOST_CHECK_EQUAL( v.esp.first, websocketpp::lib::error_code() );
     BOOST_CHECK_EQUAL( v.esp.second, "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=10; client_max_window_bits=10");
@@ -548,7 +549,7 @@ BOOST_AUTO_TEST_CASE( compress_data_large ) {
     alist["server_max_window_bits"] = "8";
     v.exts.set_server_max_window_bits(8,websocketpp::extensions::permessage_deflate::mode::smallest);
 
-    v.exts.negotiate(alist);
+    v.exts.negotiate_request(alist);
     v.exts.init(true);
 
     v.ec = v.exts.compress(compress_in,compress_out);
@@ -572,7 +573,7 @@ BOOST_AUTO_TEST_CASE( compress_data_no_context_takeover ) {
     alist["server_no_context_takeover"] = "";
     v.exts.enable_server_no_context_takeover();
 
-    v.exts.negotiate(alist);
+    v.exts.negotiate_request(alist);
     v.exts.init(true);
 
     v.ec = v.exts.compress(compress_in,compress_out1);

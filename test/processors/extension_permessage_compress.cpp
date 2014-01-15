@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE( deflate_init ) {
     websocketpp::http::parser::attribute_list attributes;
     std::pair<lib::error_code,std::string> neg_ret;
 
-    neg_ret = compressor.negotiate(attributes);
+    neg_ret = compressor.negotiate_request(attributes);
 
     BOOST_CHECK_EQUAL( neg_ret.first,
         extensions::permessage_deflate::error::invalid_parameters );*/

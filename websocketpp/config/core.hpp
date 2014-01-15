@@ -173,7 +173,7 @@ struct core {
      * Default is all except for development/debug level errors
      */
     static const websocketpp::log::level elog_level =
-        websocketpp::log::elevel::all ^ websocketpp::log::elevel::devel;
+        websocketpp::log::elevel::all;// ^ websocketpp::log::elevel::devel;
 
     /// Default static access logging channels
     /**
@@ -186,7 +186,7 @@ struct core {
      * Default is all except for development/debug level access messages
      */
     static const websocketpp::log::level alog_level =
-        websocketpp::log::alevel::all ^ websocketpp::log::alevel::devel;
+        websocketpp::log::alevel::all  | websocketpp::log::alevel::debug_handshake;// ^ websocketpp::log::alevel::devel;
 
     ///
     static const size_t connection_read_buffer_size = 16384;
@@ -227,13 +227,19 @@ struct core {
         /// If the remote endpoint requests that we reset the compression
         /// context after each message should we honor the request?
         static const bool allow_disabling_context_takeover = true;
+        static const bool server_no_context_takeover = false;
+        static const bool client_no_context_takeover = false;
+
+        static const uint8_t server_max_window_bits = 14;
+        static const uint8_t client_max_window_bits = 14;
 
         /// If the remote endpoint requests that we reduce the size of the
         /// LZ77 sliding window size this is the lowest value that will be
         /// allowed. Values range from 8 to 15. A value of 8 means we will
         /// allow any possible window size. A value of 15 means do not allow
         /// negotiation of the window size (ie require the default).
-        static const uint8_t minimum_outgoing_window_bits = 8;
+        static const uint8_t client_min_window_bits = 8;
+        static const uint8_t server_min_window_bits = 8;
     };
 
     typedef websocketpp::extensions::permessage_deflate::disabled

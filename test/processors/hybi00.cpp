@@ -71,7 +71,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    env.ec = env.p.validate_handshake(env.req);
+    env.ec = env.p.validate_handshake_request(env.req);
     BOOST_CHECK(!env.ec);
 
     websocketpp::uri_ptr u;
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE( exact_match ) {
     BOOST_CHECK_EQUAL(u->get_resource(), "/");
     BOOST_CHECK_EQUAL(u->get_port(), websocketpp::uri_default_port);
 
-    env.p.process_handshake(env.req,"",env.res);
+    env.p.process_handshake_request(env.req,"",env.res);
 
     BOOST_CHECK_EQUAL(env.res.get_header("Connection"), "Upgrade");
     BOOST_CHECK_EQUAL(env.res.get_header("Upgrade"), "WebSocket");
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE( non_get_method ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::invalid_http_method );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::invalid_http_method );
 }
 
 BOOST_AUTO_TEST_CASE( old_http_version ) {
@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE( old_http_version ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::invalid_http_version );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::invalid_http_version );
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key1 ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::missing_required_header );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::missing_required_header );
 }
 
 BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
@@ -142,7 +142,7 @@ BOOST_AUTO_TEST_CASE( missing_handshake_key2 ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK_EQUAL( env.p.validate_handshake(env.req), websocketpp::processor::error::missing_required_header );
+    BOOST_CHECK_EQUAL( env.p.validate_handshake_request(env.req), websocketpp::processor::error::missing_required_header );
 }
 
 BOOST_AUTO_TEST_CASE( bad_host ) {
@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE( bad_host ) {
 
     BOOST_CHECK(websocketpp::processor::is_websocket_handshake(env.req));
     BOOST_CHECK_EQUAL(websocketpp::processor::get_websocket_version(env.req), env.p.get_version());
-    BOOST_CHECK( !env.p.validate_handshake(env.req) );
+    BOOST_CHECK( !env.p.validate_handshake_request(env.req) );
 
     BOOST_CHECK( !env.p.get_uri(env.req)->get_valid() );
 }

@@ -1,10 +1,20 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 
 #include <websocketpp/server.hpp>
-
+#include <websocketpp/extensions/permessage_deflate/enabled.hpp>
 #include <iostream>
 
-typedef websocketpp::server<websocketpp::config::asio> server;
+struct deflate_config : public websocketpp::config::asio {
+    typedef deflate_config type;
+    /// permessage_compress extension
+    // struct deflate_conf : type::permessage_deflate_config {
+    //     static const bool no_context_takeover = true;
+    // };
+    typedef websocketpp::extensions::permessage_deflate::enabled
+        <type::permessage_deflate_config> permessage_deflate_type;
+};
+
+typedef websocketpp::server<deflate_config> server;
 
 using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
@@ -33,7 +43,8 @@ int main() {
 
 	try {
         // Set logging settings
-        echo_server.set_access_channels(websocketpp::log::alevel::all);
+        echo_server.set_access_channels(websocketpp::log::alevel::all | websocketpp::log::alevel::debug_handshake | websocketpp::log::alevel::disconnect);
+        //echo_server.set_access_channels(websocketpp::log::alevel::app);
         echo_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
 
         // Initialize ASIO

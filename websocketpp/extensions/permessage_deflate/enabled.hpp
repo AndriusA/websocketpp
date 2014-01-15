@@ -70,7 +70,7 @@ namespace extensions {
  * Negotiate the parameters of extension use
  *
  * **negotiate**\n
- * `err_str_pair negotiate(http::attribute_list const & attributes)`\n
+ * `err_str_pair negotiate_request(http::attribute_list const & attributes)`\n
  * Negotiate the parameters of extension use
  *
  * **compress**\n
@@ -206,8 +206,8 @@ public:
       : m_enabled(false)
       , m_server_no_context_takeover(false)
       , m_client_no_context_takeover(false)
-      , m_server_max_window_bits(15)
-      , m_client_max_window_bits(15)
+      , m_server_max_window_bits(default_server_max_window_bits)
+      , m_client_max_window_bits(default_client_max_window_bits)
       , m_server_max_window_bits_mode(mode::accept)
       , m_client_max_window_bits_mode(mode::accept)
       , m_initialized(false)
@@ -388,7 +388,7 @@ public:
      * @param mode The mode to use for negotiating this parameter
      * @return A status code
      */
-    lib::error_code set_server_max_window_bits(uint8_t bits, mode::value mode) {
+    lib::error_code set_server_max_window_bits(const uint8_t & bits, mode::value mode) {
         if (bits < min_server_max_window_bits || bits > max_server_max_window_bits) {
             return error::make_error_code(error::invalid_max_window_bits);
         }
@@ -419,7 +419,7 @@ public:
      * @param mode The mode to use for negotiating this parameter
      * @return A status code
      */
-    lib::error_code set_client_max_window_bits(uint8_t bits, mode::value mode) {
+    lib::error_code set_client_max_window_bits(const uint8_t & bits, mode::value mode) {
         if (bits < min_client_max_window_bits || bits > max_client_max_window_bits) {
             return error::make_error_code(error::invalid_max_window_bits);
         }
@@ -436,8 +436,32 @@ public:
      *
      * @return A WebSocket extension offer string for this extension
      */
-    std::string generate_offer() const {
-        return "";
+    err_str_pair generate_offer() const {
+        err_str_pair ret;
+        ret.first = lib::error_code();
+        ret.second = "permessage-deflate";
+
+        if (config::server_no_context_takeover) {
+            ret.second += "; server_no_context_takeover";
+        }
+
+        if (config::client_no_context_takeover) {
+            ret.second += "; client_no_context_takeover";
+        }
+
+        if (config::server_max_window_bits) {
+            std::stringstream s;
+            s << int(config::server_max_window_bits);
+            ret.second += "; server_max_window_bits="+s.str();
+        }
+
+        if (config::client_max_window_bits) {
+            std::stringstream s;
+            s << int(config::client_max_window_bits);
+            ret.second += "; client_max_window_bits="+s.str();
+        }
+
+        return ret;
     }
 
     /// Validate extension response
@@ -448,8 +472,20 @@ public:
      * @param response The server response attribute list to validate
      * @return Validation error or 0 on success
      */
-    lib::error_code validate_offer(http::attribute_list const & response) {
-        return lib::error_code();
+    err_str_pair validate_offer(http::attribute_list const & response) {
+        err_str_pair ret;
+
+        http::attribute_list::const_iterator it;
+        for (it = response.begin(); it != response.end(); ++it) {
+            // TODO: process the parameters
+        }
+
+        if (ret.first == lib::error_code()) {
+            m_enabled = true;
+            ret.second = generate_response();
+        }
+
+        return ret;
     }
 
     /// Negotiate extension
@@ -461,11 +497,12 @@ public:
      * @param offer Attribute from client's offer
      * @return Status code and value to return to remote endpoint
      */
-    err_str_pair negotiate(http::attribute_list const & offer) {
+    err_str_pair negotiate_request(http::attribute_list const & offer) {
         err_str_pair ret;
 
         http::attribute_list::const_iterator it;
         for (it = offer.begin(); it != offer.end(); ++it) {
+            // TODO: verify negotiation logic based on the spec...
             if (it->first == "server_no_context_takeover") {
                 negotiate_server_no_context_takeover(it->second,ret.first);
             } else if (it->first == "client_no_context_takeover") {
@@ -575,6 +612,8 @@ private:
     std::string generate_response() {
         std::string ret = "permessage-deflate";
 
+        // a server MAY include the "Server_no_context_takeover" extension
+        // parameter even if the negotiation offer didn't have the parameter
         if (m_server_no_context_takeover) {
             ret += "; server_no_context_takeover";
         }
