@@ -59,6 +59,7 @@
 
 // Extensions
 #include <websocketpp/extensions/permessage_deflate/disabled.hpp>
+#include <websocketpp/extensions/mobile_signaling/disabled.hpp>
 
 namespace websocketpp {
 namespace config {
@@ -174,7 +175,7 @@ struct core_client {
      * Default is all except for development/debug level errors
      */
     static const websocketpp::log::level elog_level =
-        websocketpp::log::elevel::all;// ^ websocketpp::log::elevel::devel;
+        websocketpp::log::elevel::all ^ websocketpp::log::elevel::devel;
 
     /// Default static access logging channels
     /**
@@ -261,6 +262,15 @@ struct core_client {
      * needed.
      */
     static const bool autonegotiate_compression = true;
+
+    struct mobile_signaling_config {
+        typedef type::request_type request_type;
+        typedef type::response_type response_type;
+        static const bool primary_connection = true;
+        static const bool override_coordinator = false;
+    };
+    typedef websocketpp::extensions::mobile_signaling::disabled
+        <mobile_signaling_config> mobile_signaling_type;
 };
 
 } // namespace config

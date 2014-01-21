@@ -41,6 +41,8 @@
 
 #include <websocketpp/extensions/permessage_deflate/disabled.hpp>
 #include <websocketpp/extensions/permessage_deflate/enabled.hpp>
+#include <websocketpp/extensions/mobile_signaling/disabled.hpp>
+#include <websocketpp/extensions/mobile_signaling/enabled.hpp>
 
 struct stub_config {
 	typedef websocketpp::http::parser::request request_type;
@@ -66,6 +68,13 @@ struct stub_config {
 
     typedef websocketpp::extensions::permessage_deflate::disabled
         <permessage_deflate_config> permessage_deflate_type;
+
+    struct mobile_signaling_config {
+        typedef stub_config::request_type request_type;
+        typedef stub_config::response_type response_type;
+    };
+    typedef websocketpp::extensions::mobile_signaling::disabled
+        <mobile_signaling_config> mobile_signaling_type;
 
     static const bool enable_extensions = false;
 };
@@ -94,6 +103,19 @@ struct stub_config_ext {
 
     typedef websocketpp::extensions::permessage_deflate::enabled
         <permessage_deflate_config> permessage_deflate_type;
+
+    struct mobile_signaling_config {
+        typedef stub_config::request_type request_type;
+        typedef stub_config::response_type response_type;
+        static const bool primary_connection = true;
+        static const bool override_coordinator = false;
+        static const websocketpp::uri coordinator() {
+            static websocketpp::uri ret("");
+            return ret;
+        }
+    };
+    typedef websocketpp::extensions::mobile_signaling::enabled
+        <mobile_signaling_config> mobile_signaling_type;
 
     static const bool enable_extensions = true;
 };
@@ -673,3 +695,17 @@ BOOST_AUTO_TEST_CASE( extension_negotiation_permessage_deflate ) {
     BOOST_CHECK_EQUAL( neg_results.second, "permessage-deflate" );
 }
 
+BOOST_AUTO_TEST_CASE( extension_negotiation_mobile_signaling_primary ) {
+    processor_setup_ext env(true);
+
+    std::string offer, expected;
+    offer = expected = "mobile-signaling; connection_id=foo; primary; coordinator=localhost";
+
+    env.req.replace_header("Sec-WebSocket-Extensions", offer);
+
+    std::pair<websocketpp::lib::error_code,std::string> neg_results;
+    neg_results = env.p.negotiate_extensions_request(env.req);
+
+    BOOST_CHECK( !neg_results.first );
+    BOOST_CHECK_EQUAL( neg_results.second, expected );
+}

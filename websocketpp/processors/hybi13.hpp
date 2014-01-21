@@ -63,7 +63,9 @@ public:
     typedef typename msg_manager_type::ptr msg_manager_ptr;
     typedef typename config::rng_type rng_type;
 
+    // Setup extensions
     typedef typename config::permessage_deflate_type permessage_deflate_type;
+    typedef typename config::mobile_signaling_type  mobile_signaling_type;
 
     typedef std::pair<lib::error_code,std::string> err_str_pair;
 
@@ -84,9 +86,18 @@ public:
         return m_permessage_deflate.is_implemented();
     }
 
+    /**
+     * Negotiate extensions request
+     * 
+     * Server-side method, processes extension request and negotiates attributes
+     * based on configured policies. Returns an error if attributes are invalid
+     * or are incompatible with local policy.
+     *
+     * @param request handhsake request potentially including extensions
+     * @return a pair of an error code if any and the handshake response Sec-WebSocket-Extensions part
+     */
     err_str_pair negotiate_extensions_request(request_type const & req) {
         err_str_pair ret;
-
         // Respect blanket disabling of all extensions and don't even parse
         // the extension header
         if (!config::enable_extensions) {
@@ -95,57 +106,76 @@ public:
         }
 
         http::parameter_list p;
-
         bool error = req.get_header_as_plist("Sec-WebSocket-Extensions",p);
-
         if (error) {
             ret.first = make_error_code(error::extension_parse_error);
             return ret;
         }
-
         // If there are no extensions parsed then we are done!
         if (p.size() == 0) {
             return ret;
         }
 
         http::parameter_list::const_iterator it;
-
-        if (m_permessage_deflate.is_implemented()) {
-            err_str_pair neg_ret;
-            for (it = p.begin(); it != p.end(); ++it) {
-                // look through each extension, if the key is permessage-deflate
-                if (it->first == "permessage-deflate") {
-                    neg_ret = m_permessage_deflate.negotiate_request(it->second);
-
-                    if (neg_ret.first) {
-                        // Figure out if this is an error that should halt all
-                        // extension negotiations or simply cause negotiation of
-                        // this specific extension to fail.
-                        std::cout << "permessage-compress negotiation failed: "
-                                  << neg_ret.first.message() << std::endl;
-                    } else {
-                        // Note: this list will need commas if WebSocket++ ever
-                        // supports more than one extension
-                        ret.second += neg_ret.second;
-                        m_permessage_deflate.init(base::m_server);
-                        continue;
-                    }
+        err_str_pair neg_ret;
+        for (it = p.begin(); it != p.end(); ++it) {
+            if (m_permessage_deflate.is_implemented() && 
+                it->first == "permessage-deflate") 
+            {
+                neg_ret = m_permessage_deflate.negotiate_request(it->second);
+                if (neg_ret.first) {
+                    // Figure out if this is an error that should halt all
+                    // extension negotiations or simply cause negotiation of
+                    // this specific extension to fail.
+                    std::cout << "permessage-deflate negotiation failed: "
+                              << neg_ret.first.message() << std::endl;
+                } else {
+                    // Comma-separated extensions
+                    if (!ret.second.empty())
+                        ret.second += ", ";
+                    ret.second += neg_ret.second;
+                    m_permessage_deflate.init(base::m_server);
+                    continue;
+                }
+            }
+            if (m_mobile_signaling.is_implemented() && 
+                it->first == "mobile-signaling") 
+            {
+                neg_ret = m_mobile_signaling.negotiate_request(it->second);
+                if (neg_ret.first) {
+                    std::cout << "mobile-signaling negotiation failed: "
+                              << neg_ret.first.message() << std::endl;
+                } else {
+                    // Comma-separated extensions
+                    if (!ret.second.empty())
+                        ret.second += ", ";
+                    ret.second += neg_ret.second;
+                    m_mobile_signaling.init();
                 }
             }
         }
-
         return ret;
     }
 
-    err_str_pair process_extensions_response(response_type const & resp) {
-        err_str_pair ret;
+    /**
+     * Process extension parameters from handshake response
+     * 
+     * Client-side method, processes extension response and sets up extensions
+     * with attributes based on configured policies.
+     * Returns an error if attributes are incompatible with local policy.
+     *
+     * @param request handhsake request potentially including extensions
+     * @return a pair of an error code if any and the handshake response Sec-WebSocket-Extensions part
+     */
+    lib::error_code process_extensions_response(response_type const & resp) {
+        lib::error_code ret;
 
         // Assume that extension parameters have been validated already
         http::parameter_list p;
         bool error = resp.get_header_as_plist("Sec-WebSocket-Extensions", p);
 
         if (error) {
-            ret.first = make_error_code(error::extension_parse_error);
+            ret = make_error_code(error::extension_parse_error);
             return ret;
         }
 
@@ -156,19 +186,30 @@ public:
         http::parameter_list::const_iterator it;
 
         if (m_permessage_deflate.is_implemented()) {
-            err_str_pair neg_ret;
+            lib::error_code neg_ret;
             for (it = p.begin(); it != p.end(); ++it) {
                 if (it->first == "permessage-deflate") {
                     neg_ret = m_permessage_deflate.validate_offer(it->second);
 
                     // If server response does not validate, close connection
-                    if (neg_ret.first) {
-                        return neg.ret;
+                    if (neg_ret) {
+                        return neg_ret;
                     } else {
                         // Note m_server should be FALSE
-                        ret.second += neg_ret.second;
                         m_permessage_deflate.init(base::m_server);
-                        continue;
+                    }
+                }
+                if (it->first == "mobile-signaling") {
+                    lib::error_code val_ret = m_mobile_signaling.validate_response(it->second);
+                    if (val_ret)
+                        return val_ret;
+                    else {
+                        lib::error_code proc_ret = m_mobile_signaling.process_response(it->second);
+                        if (proc_ret)
+                            return proc_ret;
+                        else {
+                            m_mobile_signaling.init();
+                        }
                     }
                 }
             }
@@ -257,11 +298,25 @@ public:
 
         req.replace_header("Sec-WebSocket-Key",base64_encode(raw_key, 16));
 
-        if (m_permessage_deflate.is_implemented()){
+        std::string extensionsOffer;
+        if (m_permessage_deflate.is_implemented()) {
             err_str_pair off_ret = m_permessage_deflate.generate_offer();
-            if (!off_ret.first)
-                req.replace_header("Sec-WebSocket-Extensions", off_ret.second);
+            if (!off_ret.first) {
+                if (!extensionsOffer.empty())
+                    extensionsOffer += ", ";
+                extensionsOffer += off_ret.second;
+            }
         }
+        if (m_mobile_signaling.is_implemented()) {
+            err_str_pair off_ret = m_mobile_signaling.generate_offer();
+            if (!off_ret.first) {
+                if (!extensionsOffer.empty())
+                    extensionsOffer += ", ";
+                extensionsOffer += off_ret.second;
+            }
+        }
+        if (!extensionsOffer.empty())
+            req.replace_header("Sec-WebSocket-Extensions", extensionsOffer);
 
         return lib::error_code();
     }
@@ -502,20 +557,13 @@ public:
      */
     lib::error_code finalize_message() {
         std::string & out = m_current_msg->msg_ptr->get_raw_payload();
+        lib::error_code ret;
 
-        // if the frame is compressed, append the compression
-        // trailer and flush the compression buffer.
-        if (m_permessage_deflate.is_enabled()
-            && frame::get_rsv1(m_basic_header))
-        {
-            uint8_t trailer[4] = {0x00, 0x00, 0xff, 0xff};
-
-            // Decompress current buffer into the message buffer
-            lib::error_code ec;
-            ec = m_permessage_deflate.decompress(trailer,4,out);
-            if (ec) {
-                return ec;
-            }
+        if (m_permessage_deflate.is_enabled()) {
+            // TODO: needs to unsed "Per-message Compressed" bit
+            ret = m_permessage_deflate.finalize_message(m_basic_header, out);
+            if (ret)
+                return ret;
         }
 
         // ensure that text messages end on a valid UTF8 code point
@@ -524,9 +572,7 @@ public:
                 return make_error_code(error::invalid_utf8);
             }
         }
-
         m_state = READY;
-
         return lib::error_code();
     }
 
@@ -624,11 +670,8 @@ public:
         frame::masking_key_type key;
         bool masked = !base::m_server;
         bool compressed = m_permessage_deflate.is_enabled()
-                          && (in->get_compressed() || out->get_compressed());
+                          && in->get_compressed();
                           
-        std::cout << "Preparing data frame, compressed? " << compressed 
-                  << m_permessage_deflate.is_enabled() << in->get_compressed() 
-                  << out->get_compressed();
         bool fin = in->get_fin();
 
         if (masked) {
@@ -797,6 +840,7 @@ protected:
      * @param len Length of buf
      * @return Number of bytes processed or zero in case of an error
      */
+    // TODO: add tests
     size_t process_payload_bytes(uint8_t * buf, size_t len, lib::error_code& ec)
     {
         // unmask if masked
@@ -820,17 +864,13 @@ protected:
         size_t offset = out.size();
 
         // decompress message if needed.
-        if (m_permessage_deflate.is_enabled()
-            && frame::get_rsv1(m_basic_header))
-        {
-            // Decompress current buffer into the message buffer
-            ec = m_permessage_deflate.decompress(buf,len,out);
-            if (ec) {
+        if (m_permessage_deflate.is_enabled()){
+            m_permessage_deflate.process_payload_bytes(
+                m_basic_header, buf, len, out, ec
+            );
+            // Error processing message
+            if (ec)
                 return 0;
-            }
-
-            // get the length of the newly uncompressed output
-            offset = out.size() - offset;
         } else {
             // No compression, straight copy
             out.append(reinterpret_cast<char *>(buf),len);
@@ -838,6 +878,7 @@ protected:
 
         // validate unmasked, decompressed values
         if (m_current_msg->msg_ptr->get_opcode() == frame::opcode::TEXT) {
+            // TODO: validator decodes the first offset bytes, not the last?
             if (!m_current_msg->validator.decode(out.begin()+offset,out.end())) {
                 ec = make_error_code(error::invalid_utf8);
                 return 0;
@@ -875,6 +916,10 @@ protected:
         // The only RSV bits allowed are rsv1 if the permessage_compress
         // extension is enabled for this connection and the message is not
         // a control message.
+        //
+        // TODO: generalize for more extensions. Also move header checking to
+        // extension itself - core logic does not need to know about extension
+        // requirements
         //
         // TODO: unit tests for this
         if (frame::get_rsv1(h) && (!m_permessage_deflate.is_enabled()
@@ -1091,6 +1136,7 @@ protected:
 
     // Extensions
     permessage_deflate_type m_permessage_deflate;
+    mobile_signaling_type m_mobile_signaling;
 };
 
 } // namespace processor

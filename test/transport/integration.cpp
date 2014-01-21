@@ -66,6 +66,12 @@ struct config : public websocketpp::config::asio_client {
     typedef websocketpp::transport::asio::endpoint<transport_config>
         transport_type;
 
+    struct m_s_conf : public type::mobile_signaling_config {
+    };
+
+    typedef websocketpp::extensions::mobile_signaling::disabled
+        <m_s_conf> mobile_signaling_type;
+
     //static const websocketpp::log::level elog_level = websocketpp::log::elevel::all;
     //static const websocketpp::log::level alog_level = websocketpp::log::alevel::all;
 

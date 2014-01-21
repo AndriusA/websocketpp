@@ -32,6 +32,7 @@
 #include <websocketpp/common/memory.hpp>
 #include <websocketpp/common/system_error.hpp>
 #include <websocketpp/error.hpp>
+#include <websocketpp/frame.hpp>
 
 #include <websocketpp/extensions/extension.hpp>
 
@@ -472,19 +473,15 @@ public:
      * @param response The server response attribute list to validate
      * @return Validation error or 0 on success
      */
-    err_str_pair validate_offer(http::attribute_list const & response) {
-        err_str_pair ret;
-
+    lib::error_code validate_offer(http::attribute_list const & response) {
+        lib::error_code ret;
         http::attribute_list::const_iterator it;
         for (it = response.begin(); it != response.end(); ++it) {
             // TODO: process the parameters
         }
-
-        if (ret.first == lib::error_code()) {
+        if (ret == lib::error_code()) {
             m_enabled = true;
-            ret.second = generate_response();
         }
-
         return ret;
     }
 
@@ -525,6 +522,49 @@ public:
             ret.second = generate_response();
         }
 
+        return ret;
+    }
+
+    /// Processes payload bytes of a message with permessage-deflate enabled
+    /**
+     * This function performs uncompression of incoming payload.
+     * It will use the input buffer as scratch space for its work.
+     *
+     * @param header header of the incoming message
+     * @param buf Input/working buffer
+     * @param len Length of buf
+     * @param output (decompressed) message payload
+     * @param ec error code, if any
+     * @return number of resulting bytes
+     */
+    size_t process_payload_bytes(frame::basic_header const & header, 
+        uint8_t const * buf, size_t len, std::string &out, lib::error_code & ec)
+    {
+        size_t offset = out.size();
+        if (frame::get_rsv1(header)) {
+            // Message is compressed if RSV1 is set
+            // Decompress current buffer into the message buffer
+            ec = decompress(buf, len, out);
+            offset = out.size() - offset;
+            return offset;
+        } else {
+            // Compression enabled but message is not compressed
+            out.append(reinterpret_cast<const char *>(buf), len);
+            return len;
+        }
+    }
+
+    lib::error_code finalize_message(frame::basic_header const & header,
+        std::string &out)
+    {
+        lib::error_code ret;
+        if (frame::get_rsv1(header)) {
+            // if the frame is compressed, append the compression
+            // trailer and flush the compression buffer.
+            uint8_t trailer[4] = {0x00, 0x00, 0xff, 0xff};
+            // Decompress current buffer into the message buffer
+            ret = decompress(trailer,4,out);
+        }
         return ret;
     }
 

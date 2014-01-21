@@ -77,9 +77,7 @@ lib::error_code connection<config>::send(const std::string& payload,
 {
     message_ptr msg = m_msg_manager->get_message(op,payload.size());
     msg->append_payload(payload);
-    std::cout << "message set compressed";
     msg->set_compressed(true);
-
     return send(msg);
 }
 
@@ -1372,15 +1370,15 @@ void connection<config>::handle_read_http_response(const lib::error_code& ec,
 
         // Read extension parameters provided by the server to verify extension
         // negotiation and complete extension setup
-        std::pair<lib::error_code,std::string> neg_results;
+        lib::error_code neg_results;
         neg_results = m_processor->process_extensions_response(m_response);
-        if (neg_results.first) {
+        if (neg_results) {
             // there was a fatal error in negotiating extension parameters that
             // should result in a failed connection attempt
             m_alog.write(log::alevel::devel,
                 std::string("Server handshake contained invalid extension parameters: ") +
-                neg_results.first.message());
-            this->terminate(neg_results.first);
+                neg_results.message());
+            this->terminate(neg_results);
         }
 
         // response is valid, connection can now be assumed to be open

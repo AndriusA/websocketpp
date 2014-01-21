@@ -37,6 +37,7 @@
 #include <websocketpp/message_buffer/message.hpp>
 #include <websocketpp/message_buffer/alloc.hpp>
 #include <websocketpp/extensions/permessage_deflate/disabled.hpp>
+#include <websocketpp/extensions/mobile_signaling/disabled.hpp>
 #include <websocketpp/random/none.hpp>
 
 struct stub_config {
@@ -62,6 +63,13 @@ struct stub_config {
 
     typedef websocketpp::extensions::permessage_deflate::disabled
         <permessage_deflate_config> permessage_deflate_type;
+
+    struct mobile_signaling_config {
+        typedef stub_config::request_type request_type;
+        typedef stub_config::response_type response_type;
+    };
+    typedef websocketpp::extensions::mobile_signaling::disabled
+        <mobile_signaling_config> mobile_signaling_type;
 };
 
 BOOST_AUTO_TEST_CASE( exact_match ) {

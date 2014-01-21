@@ -24,6 +24,7 @@ INSTALL.*
 ZERO_CHECK.*
 CMakeCache.txt
 install_manifest.txt
+Makefile
 
 # Windows/Visual Studio
 *.vcproj*

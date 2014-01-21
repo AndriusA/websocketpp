@@ -153,6 +153,10 @@ public:
         return error::make_error_code(error::no_protocol_support);
     }
 
+    lib::error_code process_extensions_response(response_type const & resp) {
+        return error::make_error_code(error::no_protocol_support);
+    }
+
     std::string get_raw(response_type const & res) const {
         response_type temp = res;
         temp.remove_header("Sec-WebSocket-Key3");

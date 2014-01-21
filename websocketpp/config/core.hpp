@@ -59,6 +59,8 @@
 
 // Extensions
 #include <websocketpp/extensions/permessage_deflate/disabled.hpp>
+#include <websocketpp/extensions/mobile_signaling/disabled.hpp>
+#include <websocketpp/uri.hpp>
 
 namespace websocketpp {
 namespace config {
@@ -186,7 +188,7 @@ struct core {
      * Default is all except for development/debug level access messages
      */
     static const websocketpp::log::level alog_level =
-        websocketpp::log::alevel::all  | websocketpp::log::alevel::debug_handshake;// ^ websocketpp::log::alevel::devel;
+        (websocketpp::log::alevel::all ^ websocketpp::log::alevel::devel ^ websocketpp::log::alevel::frame_header) | websocketpp::log::alevel::debug_handshake;
 
     ///
     static const size_t connection_read_buffer_size = 16384;
@@ -259,6 +261,33 @@ struct core {
      * needed.
      */
     //static const bool autonegotiate_compression = false;
+
+    struct mobile_signaling_config {
+        typedef type::request_type request_type;
+        typedef type::response_type response_type;
+        
+        // Connection is considered signaling if false
+        static const bool primary_connection = true;
+
+        // How we choose the coordinator
+        // ours means forcing the one defined in our config.
+        // For the client it means offering the defined coordinator
+        // and rejecting response if the coordinator there is different.
+        // For the server it means overriding the offered coordinator
+        // with own suggestion.
+        // If both 'override' and have different coordinators, connection
+        // setup fails.
+        static const bool override_coordinator = false;
+        
+        // Setting the coordinator setting
+        // TODO: can't use static const string in the config - is there a better way than this?
+        static const websocketpp::uri coordinator() {
+            static websocketpp::uri ret("");
+            return ret;
+        }
+    };
+    typedef websocketpp::extensions::mobile_signaling::disabled
+        <mobile_signaling_config> mobile_signaling_type;
 };
 
 } // namespace config

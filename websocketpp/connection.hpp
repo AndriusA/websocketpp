@@ -945,6 +945,22 @@ public:
         return m_request;
     }
 
+    /// Get response object
+    /**
+     * Direct access to response object. This can be used to call methods of the
+     * response object that are not part of the standard response API that
+     * connection wraps.
+     *
+     * Note use of this method involves using behavior specific to the
+     * configured HTTP policy. Such behavior may not work with alternate HTTP
+     * policies.
+     *
+     * @return A const reference to the raw response object
+     */
+    response_type const & get_response() const {
+        return m_response;
+    }
+
     /////////////////////////////////////////////////////////////
     // Pass-through access to the other connection information //
     /////////////////////////////////////////////////////////////

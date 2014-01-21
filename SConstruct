@@ -225,6 +225,14 @@ scratch_client = SConscript('#/examples/scratch_client/SConscript',variant_dir =
 # scratch_server
 scratch_server = SConscript('#/examples/scratch_server/SConscript',variant_dir = builddir + 'scratch_server',duplicate = 0)
 
+# mobile_signaling_server
+mobile_signaling_server = SConscript('#/examples/mobile_signaling_server/SConscript',variant_dir = builddir + 'mobile_signaling_server',duplicate = 0)
+
+# mobile_signaling_client
+mobile_signaling_client = SConscript('#/examples/mobile_signaling_client/SConscript',variant_dir = builddir + 'mobile_signaling_client',duplicate = 0)
+
+# mobile_signaling_proxy
+mobile_signaling_proxy = SConscript('#/examples/mobile_signaling_proxy/SConscript',variant_dir = builddir + 'mobile_signaling_proxy',duplicate = 0)
 
 # subprotocol_server
 subprotocol_server = SConscript('#/examples/subprotocol_server/SConscript',variant_dir = builddir + 'subprotocol_server',duplicate = 0)
@@ -238,3 +246,4 @@ if not env['PLATFORM'].startswith('win'):
 
     # print_server
     print_server = SConscript('#/examples/print_server/SConscript',variant_dir = builddir + 'print_server',duplicate = 0)
+

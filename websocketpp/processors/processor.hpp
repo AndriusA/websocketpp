@@ -187,9 +187,7 @@ public:
         return err_str_pair();
     }
 
-    virtual err_str_pair process_extensions_response(response_type const & response) {
-        return err_str_pair();
-    }
+    virtual lib::error_code process_extensions_response(response_type const & response) = 0;
 
     /// validate a WebSocket handshake request for this version
     /**

@@ -57,8 +57,8 @@ public:
     err_str_pair negotiate_request(http::attribute_list const & attributes) {
         return make_pair(make_error_code(error::disabled),std::string());
     }
-    err_str_pair validate_offer(http::attribute_list const & response) {
-        return make_pair(make_error_code(error::disabled),std::string());
+    lib::error_code validate_offer(http::attribute_list const & response) {
+        return make_error_code(error::disabled);
     }
 
     /// Initialize state
@@ -76,6 +76,18 @@ public:
     /// connection
     bool is_enabled() const {
         return false;
+    }
+
+    size_t process_payload_bytes(frame::basic_header const & header, 
+        uint8_t const * buf, size_t len, std::string &out, lib::error_code & ec)
+    {
+        ec = make_error_code(error::disabled);
+        return 0;
+    }
+    lib::error_code finalize_message(frame::basic_header const & header,
+        std::string &out)
+    {
+        return make_error_code(error::disabled);
     }
 
     lib::error_code compress(std::string const & in, std::string & out) {
