@@ -112,6 +112,10 @@ struct stub_config_ext {
         static const websocketpp::uri coordinator() {
             static websocketpp::uri ret("");
             return ret;
+        };
+        static const websocketpp::uri destination() {
+            static websocketpp::uri ret("");
+            return ret;
         }
     };
     typedef websocketpp::extensions::mobile_signaling::enabled

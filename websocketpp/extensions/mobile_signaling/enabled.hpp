@@ -137,8 +137,9 @@ public:
 
     enabled()
       : m_enabled(false)
-      , m_primary_connection(false)
+      , m_primary_connection(config::primary_connection)
       , m_coordinator("")
+      , m_destination("")
       , m_initialized(false)
     {
         m_coordinator = config::coordinator();
@@ -197,6 +198,7 @@ public:
      * @return A WebSocket extension offer string for this extension
      */
     err_str_pair generate_offer() const {
+        std::cout << "generate offer " << std::endl;
         err_str_pair ret;
         ret.second = "mobile-signaling";
 
@@ -209,7 +211,9 @@ public:
         // hence configured at compile time
         if (config::primary_connection)
             ret.second += "; primary";
-        ret.second += "; coordinator=" + config::coordinator().str();
+        ret.second += "; coordinator=\"" + config::coordinator().str() + "\"";
+        // if (!config::primary_connection)
+            ret.second += "; destination=\"" + config::destination().str() + "\"";
         return ret;
     }
 
@@ -224,7 +228,7 @@ public:
     lib::error_code validate_response(http::attribute_list const & response) {
         lib::error_code err;
         http::attribute_list::const_iterator it;
-        bool id, type, coordinator;
+        bool id, primary, coordinator, destination;
         for (it = response.begin(); it != response.end(); ++it) {
             if (it->first == "connection_id") {
                 if (it->second.empty() || id)
@@ -236,10 +240,10 @@ public:
                 else
                     id = true;
             } else if (it->first == "primary" || it->first == "secondary") {
-                if (!it->second.empty() || type)
+                if (!it->second.empty() || primary)
                     err = make_error_code(error::invalid_attributes);
                 else
-                    type = true;
+                    primary = true;
             } else if (it->first == "coordinator") {
                 if (it->second.empty() || coordinator)
                     // We need to have a coordinator and there can only be one
@@ -247,6 +251,12 @@ public:
                 else
                     // TODO: verify the URL maybe?
                     coordinator = true;
+            } else if (it->first == "destination") {
+                if (it->second.empty() || destination)
+                    err = make_error_code(error::invalid_attributes);
+                else
+                    //TODO: verify url?
+                    destination = true;
             } else {
                 // No other attributes are allowed
                 err = make_error_code(error::invalid_attributes);
@@ -254,7 +264,7 @@ public:
             if (err)
                 break;
         }
-        if (!id || !coordinator)
+        if (!id || !coordinator)// || (primary && !destination))
             // All attributes MUST be present
             err = make_error_code(error::invalid_attributes);
 
@@ -283,6 +293,7 @@ public:
         // TODO: negotiate parameters to respond to the client
         http::attribute_list::const_iterator it;
         for (it = offer.begin(); it != offer.end(); ++it) {
+            std::cout << "negotiating " << it->first << " - " << it->second << std::endl;
             // TODO: verify negotiation logic based on the spec...
             if (it->first == "connection_id") {
                 generate_server_connection_id(it->second,ret.first);
@@ -291,6 +302,11 @@ public:
                 m_primary_connection = true;
             } else if (it->first == "coordinator") {
                 negotiate_coordinator(it->second,ret.first);
+            } else if (it->first == "destination") {
+                //skip - destination should be ok
+                websocketpp::uri dest(it->second);
+                m_destination = dest;
+                std::cout << "request destination " << it->second << std::endl;
             } else {
                 ret.first = make_error_code(error::invalid_attributes);
             }
@@ -303,6 +319,7 @@ public:
         if (ret.first == lib::error_code()) {
             m_enabled = true;
             ret.second = generate_response();
+            std::cout << "generated response" << ret.second << std::endl;
         }
 
         return ret;
@@ -319,7 +336,9 @@ private:
         ret += "; connection_id=" + m_connection_id;
         if (m_primary_connection)
             ret += "; primary";
-        ret += "; coordinator="+m_coordinator.str();
+        ret += "; coordinator=\""+m_coordinator.str() + "\"";
+        if (m_destination.get_valid())
+            ret += "; destination=\""+m_destination.str() + "\"";
         return ret;
     }
 
@@ -363,6 +382,7 @@ private:
     bool m_enabled;
     bool m_primary_connection;
     websocketpp::uri m_coordinator;
+    websocketpp::uri m_destination;
     bool m_initialized;
 };
 
