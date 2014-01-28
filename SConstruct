@@ -237,6 +237,9 @@ mobile_signaling_proxy = SConscript('#/examples/mobile_signaling_proxy/SConscrip
 # subprotocol_server
 subprotocol_server = SConscript('#/examples/subprotocol_server/SConscript',variant_dir = builddir + 'subprotocol_server',duplicate = 0)
 
+# app_client
+app_client = SConscript('#/examples/app_client/SConscript',variant_dir = builddir + 'app_client',duplicate = 0)
+
 if not env['PLATFORM'].startswith('win'):
     # iostream_server
     iostream_server = SConscript('#/examples/iostream_server/SConscript',variant_dir = builddir + 'iostream_server',duplicate = 0)
