@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <map>
-#include <queue>
+#include <deque>
 #include <string>
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
@@ -33,6 +33,11 @@ void on_message(client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
 class app_connection {
 public:
     typedef websocketpp::lib::shared_ptr<app_connection> ptr;
+    typedef websocketpp::lib::lock_guard<websocketpp::lib::mutex> scoped_lock;
+
+    app_connection() {
+
+    }
 
     app_connection(size_t id, websocketpp::connection_hdl hdl)
       : m_id(id)
@@ -45,14 +50,14 @@ public:
 
     }
     void on_open(websocketpp::connection_hdl) {
-
+        std::cout << "connection open!" << std::endl;
     }
     void on_close(websocketpp::connection_hdl) {
 
     }
 
     bool print_new_messages() {
-        websocketpp::lib::lock_guard<websocketpp::lib::mutex> guard(m_mutex);
+        scoped_lock guard(m_mutex);
 
         if (m_messages.empty()) {
             return false;
@@ -62,6 +67,7 @@ public:
             std::cout << m_messages.front() << std::endl;
             m_messages.pop_front();
         }
+        return true;
     }
 
     websocketpp::connection_hdl get_hdl() const {
@@ -71,7 +77,7 @@ private:
     websocketpp::lib::mutex m_mutex;
     size_t m_id;
     // list of messages
-    std::queue<std::string> m_messages;
+    std::deque<std::string> m_messages;
     websocketpp::connection_hdl m_hdl;
 };
 
@@ -103,12 +109,13 @@ public:
         }
        
         
-        app_connection::ptr app(new app_connection(next_id++,con->get_handle()));
+        app_connection::ptr app;
+        app.reset(new app_connection(next_id++,con->get_handle()));
 
-        con->set_open_handler(bind(&app_connection::on_open,*app));
-        con->set_fail_handler(bind(&app_connection::on_fail,*app));
-        con->set_message_handler(bind(&app_connection::on_message,*app));
-        con->set_close_handler(bind(&app_connection::on_close,*app));
+        con->set_open_handler(bind(&app_connection::on_open, app, websocketpp::lib::placeholders::_1));
+        // con->set_fail_handler(bind(&app_connection::on_fail,*app));
+        con->set_message_handler(bind(&app_connection::on_message,app, websocketpp::lib::placeholders::_1, websocketpp::lib::placeholders::_2));
+        // con->set_close_handler(bind(&app_connection::on_close,*app));
 
         m_endpoint.connect(con);
 
@@ -117,6 +124,10 @@ public:
 
     void close(websocketpp::connection_hdl hdl) {
         
+    }
+
+    void send(websocketpp::connection_hdl hdl, std::string message) {
+        m_endpoint.send(hdl, message, websocketpp::frame::opcode::text);
     }
 
     void shutdown() {
@@ -135,7 +146,7 @@ private:
     
     size_t next_id;
 
-    std::map<connection_hdl> m_connections;
+    // std::map<websocketpp::connection_hdl> m_connections;
     client m_endpoint;
     thread_ptr m_thread;
 };
@@ -145,6 +156,7 @@ int main(int argc, char* argv[]) {
 
     std::string command;
     bool done = false;
+    app_connection::ptr app;
 
     while (!done) {
         std::getline(std::cin, command);
@@ -154,12 +166,18 @@ int main(int argc, char* argv[]) {
         } else if (command == "list") {
             
         } else if (command.substr(0,7) == "connect") {
-            
+            std::string uri = command.substr(8, command.length()-8);
+            std::cout << "connecting " << uri << std::endl;
+            app = client.connect(uri);
         } else if (command.substr(0,5) == "close") {
             
         } else if (command.substr(0,8) == "messages") {
-            
-        } else {
+            app->print_new_messages();
+        } else if (command.substr(0,4) == "send") {
+            std::string message = command.substr(4, command.length()-4);
+            client.send(app->get_hdl(), message);
+        }
+        else {
             std::cout << "Invalid Command" << std::endl;
         }
     }
