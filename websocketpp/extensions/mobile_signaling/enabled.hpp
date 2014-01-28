@@ -137,7 +137,7 @@ public:
 
     enabled()
       : m_enabled(false)
-      , m_primary_connection(config::primary_connection)
+      , m_primary_connection(false)
       , m_coordinator("")
       , m_destination("")
       , m_initialized(false)
@@ -197,23 +197,26 @@ public:
      * 
      * @return A WebSocket extension offer string for this extension
      */
-    err_str_pair generate_offer() const {
-        std::cout << "generate offer " << std::endl;
+    err_str_pair generate_offer(uri_ptr uri) const {
+        std::cout << "generate offer... ";
         err_str_pair ret;
         ret.second = "mobile-signaling";
 
         // TODO: how do we generate connection_id?
         ret.second += "; connection_id=alvbjajodbaodvb";
 
-        // The type of connection is based on config
+        std::string con_uri = uri->str();
+
         // The direct connection will always be the primary one
         // and the secondary one will always and only be from a proxy
-        // hence configured at compile time
-        if (config::primary_connection)
+        std::cout << "Connection uri: " << con_uri << std::endl;
+        std::cout << "Coordinator uri: " << config::destination().str() << std::endl;
+        if (con_uri.compare(config::destination().str()) == 0) {
             ret.second += "; primary";
+        }
         ret.second += "; coordinator=\"" + config::coordinator().str() + "\"";
-        // if (!config::primary_connection)
-            ret.second += "; destination=\"" + config::destination().str() + "\"";
+        ret.second += "; destination=\"" + config::destination().str() + "\"";
+        std::cout << ret.second << std::endl;
         return ret;
     }
 

@@ -21,7 +21,7 @@ struct mobile_signaling_conf : public websocketpp::config::asio {
             return ret;
         };
         static const websocketpp::uri destination() {
-            static websocketpp::uri ret("ws://localhost:9002");
+            static websocketpp::uri ret("");
             return ret;
         };
     };
@@ -168,8 +168,8 @@ private:
             return proxy_client::ptr();
         }
        
-        proxy_client::ptr client;
-        client.reset(new proxy_client(con->get_handle()));
+        proxy_client::ptr p_client_ptr;
+        p_client_ptr.reset(new proxy_client(con->get_handle()));
 
         // con->set_open_handler(bind(&proxy_client::on_open, client, ::_1));
         con->set_fail_handler(bind(&signaling_proxy_server::on_fail_out, this, in_hdl, ::_1));
@@ -177,7 +177,7 @@ private:
         con->set_close_handler(bind(&signaling_proxy_server::on_close_out, this, in_hdl, ::_1));
 
         m_client.connect(con);
-        return client;
+        return p_client_ptr;
     }
 
     bool validate(connection_hdl hdl) {
@@ -224,11 +224,6 @@ private:
         return true;
     }
 };
-
-void inthandler(int s) {
-    std::cout << "shutting down.. " << s << std::endl;
-    exit(1);
-}
 
 int main(int argc, char* argv[]) {
     signaling_proxy_server server;

@@ -52,6 +52,7 @@ namespace mobile_signaling {
 template <typename config>
 class disabled {
     typedef std::pair<lib::error_code,std::string> err_str_pair;
+    typedef typename config::request_type request_type;
 
 public:
     err_str_pair negotiate_request(http::attribute_list const & attributes) {
@@ -82,7 +83,7 @@ public:
         return false;
     }
 
-    err_str_pair generate_offer() const {
+    err_str_pair generate_offer(uri_ptr uri) const {
         err_str_pair ret;
         ret.first = make_error_code(error::disabled);
         return ret;

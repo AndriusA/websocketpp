@@ -28,6 +28,7 @@ using websocketpp::connection_hdl;
 using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
 using websocketpp::lib::bind;
+using websocketpp::lib::error_code;
 
 struct subconnection_info {
     std::string id;
@@ -44,7 +45,7 @@ public:
 
         m_server.set_open_handler(bind(&mobile_signaling_server::on_open,this,::_1));
         m_server.set_close_handler(bind(&mobile_signaling_server::on_close,this,::_1));
-        m_server.set_message_handler(bind(&mobile_signaling_server::on_message,this,::_1,::_2));
+        // m_server.set_message_handler(bind(&mobile_signaling_server::on_message,this,::_1,::_2));
 
         m_server.clear_access_channels(websocketpp::log::alevel::frame_payload);
         m_server.set_validate_handler(bind(&mobile_signaling_server::validate,this,::_1));
@@ -113,111 +114,160 @@ public:
             return;
         }
 
-        websocketpp::http::parameter_list::const_iterator it;
-        for (it = extensions.begin(); it != extensions.end(); ++it) {
+        bool primary_connection = false;
+        std::string id;
+        for (websocketpp::http::parameter_list::const_iterator it = extensions.begin(); it != extensions.end(); ++it) {
             if (it->first == "mobile-signaling") {
                 websocketpp::http::attribute_list::const_iterator param;
-                subconnection_info info;
                 // Parse the negotiated parameters
                 for (param = it->second.begin(); param != it->second.end(); ++param) {
                     if (param->first == "connection_id")
-                        info.id = param->second;
+                        id = param->second;
                     else if (param->first == "primary") {
-                        info.primary_connection = true;
+                        primary_connection = true;
                     }
-                }
-                // Use the parameters to set up subconnection
-                m_con_ids[hdl] = info;
-                auto it = m_connections.find(info.id);
-                if (it == m_connections.end()) {
-                    if (info.primary_connection) {
-                        // Connection with this ID does not exist and the new link is primary
-                        connection_pair connection;
-                        connection.primary = hdl;
-                        m_connections[info.id] = connection;
-                    } else {
-                        // Connection with this Id does not exist and the new link is signaling...
-                        // Protocol violation!
-                        // TODO: fail with an error
-                        con->close(websocketpp::close::status::protocol_error, "no primary connection to signal");
-                        return;
-                    }
-                } else {
-                    if (info.primary_connection) {
-                        // Adding the primary link to the connection when there is one...
-                        // TODO: What happens if it is dead vs if it is alive?
-                        // If it is alive, should reject? But what if we only _think_ it is alive (NAT timeout)?
-                        // For now assum protocol error... Fail!
-                        con->close(websocketpp::close::status::protocol_error, "tried reestablishing primary connection");
-                        return;
-                    } else {
-                        it->second.signaling = hdl;
-                    }
-                    
                 }
             }
         }
 
-    }
-
-    void on_close(connection_hdl hdl) {
-        subconnection_info info = get_subconnection_from_hdl(hdl);
-        auto it = m_connections.find(info.id);
-        if (it == m_connections.end()) {
-            // this connection is not in the list. This really shouldn't happen
-            // and probably means something else is wrong.
-            throw std::invalid_argument("Don't know what to close");
+        auto it = m_connections.find(id);
+        // Close the new connection if we have a protocol error
+        if (it == m_connections.end() && !primary_connection) {
+            // Want to set up a signaling connection for inexsiting primary con
+            con->close(websocketpp::close::status::protocol_error, "no primary connection to signal");
+            return;
         }
-        if (info.primary_connection) {
-            std::cout << "resetting primary connection for " << info.id << "\n";
-            it->second.primary.reset();
+        if (it != m_connections.end() && primary_connection && !it->second.primary.expired()) {
+            // Want to set up a primary connection while one already exists
+            con->close(websocketpp::close::status::protocol_error, "primary link exists");
+            return;
+        }
+
+        // Set up connection pairs in the map
+        if (it == m_connections.end() && primary_connection) {
+            // Connection with this ID does not exist and the new link is primary
+            connection_pair connection;
+            connection.primary = hdl;
+            std::pair<con_list::iterator, bool> ret = m_connections.insert(std::pair<std::string, connection_pair>(id, connection));
+            if (!ret.second) {
+                std::cerr << "Connection not inserted, key already existed!" << std::endl;
+            }
+            it = ret.first;            
+        } else if (primary_connection && it->second.primary.expired()) {
+            // Adding the primary link to the connection after it has died
+            it->second.primary = hdl;            
+        } else {
+            it->second.signaling = hdl;
+        }
+        
+        // Set up the various handlers for the pair of connections
+        if (primary_connection){
+            con->set_close_handler(bind(&mobile_signaling_server::on_close_primary, this, ::_1, id));
+            con->set_message_handler(bind(&mobile_signaling_server::on_message_primary, this, ::_1, it->second.signaling, ::_2));
+            if (!it->second.signaling.expired()) {
+                server::connection_ptr signaling_con = m_server.get_con_from_hdl(it->second.signaling);
+                signaling_con->set_message_handler(bind(&mobile_signaling_server::on_message_signaling, this, ::_1, it->second.primary, ::_2));
+            }
         }
         else {
-            std::cout << "resetting signaling connection for " << info.id << "\n";
-            it->second.signaling.reset();
+            con->set_close_handler(bind(&mobile_signaling_server::on_close_signaling, this, ::_1, id));
+            // Bind message handler to use the new connection handler and previously established primary
+            con->set_message_handler(bind(&mobile_signaling_server::on_message_signaling, this, it->second.primary, ::_1, ::_2));
+            server::connection_ptr primary_con = m_server.get_con_from_hdl(it->second.primary);
+            primary_con->set_message_handler(bind(&mobile_signaling_server::on_message_primary, this, ::_1, it->second.signaling, ::_2));
         }
-        if (it->second.primary.use_count() == 0 && it->second.signaling.use_count() == 0) {
-            std::cout << "deleting connection " << info.id << "\n";
-            m_connections.erase(info.id);
-        }
-        m_con_ids.erase(hdl);
+
+        std::cout << "Opened " << (primary_connection?"primary":"secondary") << " connection, hdl " << hdl.lock().get();
     }
 
-    void on_message(connection_hdl hdl, server::message_ptr msg) {
-        // This will be a serious bottleneck... Need linear lookup of peer connections!
-        subconnection_info info = get_subconnection_from_hdl(hdl);
-        std::cout << "on_message called on " << (info.primary_connection?"primary":"secondary") 
-            << " link with hdl: " << hdl.lock().get()
-            << " and message: " << msg->get_payload()
-            << std::endl;
+    // Simple on_close method - only called if closed before primary and signaling links are setup
+    void on_close(connection_hdl hdl) {
+        std::cout << "Connection " << hdl.lock().get() << " closed before setup finished" << std::endl;
+    }
 
-        // if (info.type == secondary)
-
-        // if (data.name == "") {
-        //     data.name = msg->get_payload();
-        //     std::cout << "Setting name of connection with sessionid "
-        //               << data.sessionid << " to " << data.name << std::endl;
-        // } else {
-        //     std::cout << "Got a message from connection " << data.name
-        //               << " with sessionid " << data.sessionid << std::endl;
-        // }
-
-        try {
-            m_server.send(hdl, msg->get_payload(), msg->get_opcode());
-        } catch (const websocketpp::lib::error_code& e) {
-            std::cout << "Echo failed because: " << e
-                      << "(" << e.message() << ")" << std::endl;
+    void on_close_primary(connection_hdl hdl, std::string connection_id) {
+        std::cout << "Closed primary connection for " << connection_id << "\n";
+        auto it = m_connections.find(connection_id);
+        if (it == m_connections.end()) {
+            std::cerr << "Don't know what to close!" << std::endl;
+            return;
+        }
+        error_code ec;
+        server::connection_ptr con = m_server.get_con_from_hdl(it->second.signaling, ec);
+        if (ec) {
+            std::cout << "signaling also dead, deleting connection " << connection_id << "\n";
+            m_connections.erase(connection_id);
+            return;
+        }
+        websocketpp::session::state::value state = con->get_state();
+        if (state == websocketpp::session::state::closing || state == websocketpp::session::state::closed) {
+            std::cout << "signaling also dead, deleting connection " << connection_id << "\n";
+            m_connections.erase(connection_id);
         }
     }
 
-    subconnection_info get_subconnection_from_hdl(connection_hdl hdl) {
-        auto it = m_con_ids.find(hdl);
-        if (it == m_con_ids.end()) {
-            // this connection is not in the list. This really shouldn't happen
-            // and probably means something else is wrong.
-            throw std::invalid_argument("Can't find subconnection");
+    void on_close_signaling(connection_hdl hdl, std::string connection_id) {
+        std::cout << "Closed signaling connection for " << connection_id << "\n";
+        auto it = m_connections.find(connection_id);
+        if (it == m_connections.end()) {
+            std::cerr << "Don't know what to close!" << std::endl;
+            return;
         }
-        return it->second;
+        error_code ec;
+        server::connection_ptr con = m_server.get_con_from_hdl(it->second.primary, ec);
+        if (ec) {
+            std::cout << "primary also dead, deleting connection " << connection_id << "\n";
+            m_connections.erase(connection_id);
+            return;
+        }
+        websocketpp::session::state::value state = con->get_state();
+        if (state == websocketpp::session::state::closing || state == websocketpp::session::state::closed) {
+            std::cout << "primary also dead, deleting connection " << connection_id << "\n";
+            m_connections.erase(connection_id);
+        }
+    }
+
+    /// on_message can be called from either connection handler and will reply on either,
+    /// With priority given to the primary connection
+    void on_message_primary(connection_hdl primary, connection_hdl signaling, server::message_ptr msg) {
+        std::cout << "Message arrived on primary: " << msg->get_payload() << std::endl;
+        server::message_ptr response = generateResponse(msg);
+        send_message_downlink(primary, signaling, response);
+    }
+
+    void on_message_signaling(connection_hdl primary, connection_hdl signaling, server::message_ptr msg) {
+        std::cout << "Message arrived on signaling: " << msg->get_payload() << std::endl;
+        server::message_ptr response = generateResponse(msg);
+        send_message_downlink(primary, signaling, response);
+    }
+
+    void send_message_downlink(connection_hdl primary, connection_hdl signaling, server::message_ptr msg) {
+        std::cout << "Sending message downlink" << std::endl;
+        // If we have a priamry link for the connection
+        if (!primary.expired() && primary.lock().get()) {
+            try {
+                std::cout << "sending response to primary" << std::endl;
+                m_server.send(primary, msg->get_payload(), msg->get_opcode());
+            } catch (const websocketpp::lib::error_code& e) {
+                std::cout << "Echo failed because: " << e
+                          << "(" << e.message() << ")" << std::endl;
+            }            
+        } else if (!signaling.expired() && signaling.lock().get()) {
+            try {
+                std::cout << "sending response to signaling" << std::endl;
+                m_server.send(signaling, msg->get_payload(), msg->get_opcode());
+            } catch (const websocketpp::lib::error_code& e) {
+                std::cout << "Echo failed because: " << e
+                          << "(" << e.message() << ")" << std::endl;
+            }
+        } else {
+            std::cerr << "Echo failed because both links are down" << std::endl;
+        }
+    }
+
+    /// Generate response to an incoming message - at this point an echo
+    server::message_ptr generateResponse(server::message_ptr msg) {
+        return msg;
     }
 
     void run(uint16_t port) {
@@ -226,11 +276,9 @@ public:
         m_server.run();
     }
 private:
-    typedef std::map<connection_hdl,subconnection_info,std::owner_less<connection_hdl>> con_map;
     typedef std::map<std::string,connection_pair> con_list;
 
     server m_server;
-    con_map m_con_ids;
     con_list m_connections;
 };
 

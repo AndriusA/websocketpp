@@ -308,7 +308,7 @@ public:
             }
         }
         if (m_mobile_signaling.is_implemented()) {
-            err_str_pair off_ret = m_mobile_signaling.generate_offer();
+            err_str_pair off_ret = m_mobile_signaling.generate_offer(uri);
             if (!off_ret.first) {
                 if (!extensionsOffer.empty())
                     extensionsOffer += ", ";
