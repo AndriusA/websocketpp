@@ -177,7 +177,7 @@ public:
             primary_con->set_message_handler(bind(&mobile_signaling_server::on_message_primary, this, ::_1, it->second.signaling, ::_2));
         }
 
-        std::cout << "Opened " << (primary_connection?"primary":"secondary") << " connection, hdl " << hdl.lock().get();
+        std::cout << "Opened " << (primary_connection?"primary":"secondary") << " connection, hdl " << hdl.lock().get() << std::endl;
     }
 
     // Simple on_close method - only called if closed before primary and signaling links are setup
