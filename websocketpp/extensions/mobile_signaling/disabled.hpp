@@ -53,8 +53,11 @@ template <typename config>
 class disabled {
     typedef std::pair<lib::error_code,std::string> err_str_pair;
     typedef typename config::request_type request_type;
+    typedef typename config::rng_type rng_type;
 
 public:
+    disabled(rng_type & rng) {}
+
     err_str_pair negotiate_request(http::attribute_list const & attributes) {
         return make_pair(make_error_code(error::disabled),std::string());
     }
@@ -83,7 +86,7 @@ public:
         return false;
     }
 
-    err_str_pair generate_offer(uri_ptr uri) const {
+    err_str_pair generate_offer(uri_ptr uri, request_type const & req) const {
         err_str_pair ret;
         ret.first = make_error_code(error::disabled);
         return ret;

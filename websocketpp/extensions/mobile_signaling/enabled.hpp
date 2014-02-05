@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Peter Thorson. All rights reserved.
+ * Copyright (c) 2014, Andrius Aucinas. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -134,15 +134,18 @@ public:
 
     typedef typename config::request_type request_type;
     typedef typename config::response_type response_type;
+    typedef typename config::rng_type rng_type;
 
-    enabled()
+    explicit enabled(rng_type& rng)
       : m_enabled(false)
       , m_primary_connection(false)
       , m_coordinator("")
       , m_destination("")
       , m_initialized(false)
+      , m_rng(rng)
     {
         m_coordinator = config::coordinator();
+        // std::cout << "testing RNG:" << m_rng() << std::endl;
         //constructor
     }
 
@@ -197,13 +200,40 @@ public:
      * 
      * @return A WebSocket extension offer string for this extension
      */
-    err_str_pair generate_offer(uri_ptr uri) const {
+    err_str_pair generate_offer(uri_ptr uri, request_type const & req) const {
         std::cout << "generate offer... ";
         err_str_pair ret;
         ret.second = "mobile-signaling";
 
-        // TODO: how do we generate connection_id?
-        ret.second += "; connection_id=alvbjajodbaodvb";
+        http::parameter_list p;
+        bool error = req.get_header_as_plist("Sec-WebSocket-Extensions",p);
+        std::string con_id = "";
+        if (!error) {
+            http::parameter_list::const_iterator it;
+            err_str_pair neg_ret;
+            for (it = p.begin(); it != p.end(); ++it) {
+                if (it->first == "mobile-signaling") {
+                    http::attribute_list attr_list = it->second;
+                    http::attribute_list::const_iterator attr_it;
+                    for (attr_it = attr_list.begin(); attr_it != attr_list.end(); attr_it++) {
+                        if (attr_it->first == "connection_id")
+                            con_id = attr_it->second;
+                            
+                    }
+                }
+            }
+        }
+        if (con_id.length() == 0) {
+            // Generate connection ID
+            frame::uint32_converter conv;
+            unsigned char raw_id[16];
+            for (int i = 0; i < 4; i++) {
+                conv.i = m_rng();
+                std::copy(conv.c,conv.c+4,&raw_id[i*4]);
+            }
+            con_id = base64_encode(raw_id, 16);
+        }
+        ret.second += "; connection_id=\"" + con_id + "\"";
 
         std::string con_uri = uri->str();
 
@@ -211,7 +241,7 @@ public:
         // and the secondary one will always and only be from a proxy
         std::cout << "Connection uri: " << con_uri << std::endl;
         std::cout << "Coordinator uri: " << config::destination().str() << std::endl;
-        if (con_uri.compare(config::destination().str()) == 0) {
+        if (!config::coordinator().get_valid() || con_uri.compare(config::destination().str()) == 0) {
             ret.second += "; primary";
         }
         ret.second += "; coordinator=\"" + config::coordinator().str() + "\"";
@@ -336,7 +366,7 @@ private:
     std::string generate_response() {
         std::string ret;
         ret = "mobile-signaling";
-        ret += "; connection_id=" + m_connection_id;
+        ret += "; connection_id=\"" + m_connection_id + "\"";
         if (m_primary_connection)
             ret += "; primary";
         ret += "; coordinator=\""+m_coordinator.str() + "\"";
@@ -387,6 +417,8 @@ private:
     websocketpp::uri m_coordinator;
     websocketpp::uri m_destination;
     bool m_initialized;
+
+    rng_type & m_rng;
 };
 
 } // namespace mobile_signaling

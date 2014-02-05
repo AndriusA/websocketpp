@@ -51,7 +51,8 @@
 #include <websocketpp/logger/basic.hpp>
 
 // RNG
-#include <websocketpp/random/none.hpp>
+//#include <websocketpp/random/none.hpp>
+#include <websocketpp/random/random_device.hpp>
 
 // User stub base classes
 #include <websocketpp/endpoint_base.hpp>
@@ -91,7 +92,8 @@ struct core {
         websocketpp::log::alevel> alog_type;
 
     /// RNG policies
-    typedef websocketpp::random::none::int_generator<uint32_t> rng_type;
+    typedef websocketpp::random::random_device::int_generator<uint32_t,
+        concurrency_type> rng_type;
 
     /// Controls compile time enabling/disabling of thread syncronization
     /// code Disabling can provide a minor performance improvement to single
@@ -265,6 +267,7 @@ struct core {
     struct mobile_signaling_config {
         typedef type::request_type request_type;
         typedef type::response_type response_type;
+        typedef type::rng_type rng_type;
         
         // Connection is considered signaling if false
         static const bool primary_connection = true;

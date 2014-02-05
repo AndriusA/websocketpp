@@ -266,6 +266,7 @@ struct debug_core {
     struct mobile_signaling_config {
         typedef type::request_type request_type;
         typedef type::response_type response_type;
+        typedef type::rng_type rng_type;
         static const bool primary_connection = true;
         static const bool override_coordinator = false;
     };

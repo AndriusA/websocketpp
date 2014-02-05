@@ -74,6 +74,7 @@ public:
       : processor<config>(secure,server)
       , m_msg_manager(manager)
       , m_rng(rng)
+      , m_mobile_signaling(rng)
     {
         reset_headers();
     }
@@ -308,7 +309,7 @@ public:
             }
         }
         if (m_mobile_signaling.is_implemented()) {
-            err_str_pair off_ret = m_mobile_signaling.generate_offer(uri);
+            err_str_pair off_ret = m_mobile_signaling.generate_offer(uri, req);
             if (!off_ret.first) {
                 if (!extensionsOffer.empty())
                     extensionsOffer += ", ";
