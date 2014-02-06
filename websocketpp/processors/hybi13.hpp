@@ -170,7 +170,7 @@ public:
      */
     lib::error_code process_extensions_response(response_type const & resp) {
         lib::error_code ret;
-
+        std::cout << "Process extensions response" << std::endl;
         // Assume that extension parameters have been validated already
         http::parameter_list p;
         bool error = resp.get_header_as_plist("Sec-WebSocket-Extensions", p);
@@ -200,12 +200,19 @@ public:
                         m_permessage_deflate.init(base::m_server);
                     }
                 }
+            }
+        }
+        if (m_mobile_signaling.is_implemented()) {
+            lib::error_code neg_ret;
+            for (it = p.begin(); it != p.end(); ++it) {
                 if (it->first == "mobile-signaling") {
                     lib::error_code val_ret = m_mobile_signaling.validate_response(it->second);
                     if (val_ret)
                         return val_ret;
                     else {
+                        std::cout << "Process mobile-signaling extension parameters ";
                         lib::error_code proc_ret = m_mobile_signaling.process_response(it->second);
+                        std::cout << "enabled? " << m_mobile_signaling.is_enabled() << std::endl;
                         if (proc_ret)
                             return proc_ret;
                         else {
@@ -566,6 +573,12 @@ public:
             if (ret)
                 return ret;
         }
+        if (m_mobile_signaling.is_enabled()) {
+            std::string & extout = m_current_msg->msg_ptr->get_raw_extension_data();
+            ret = m_mobile_signaling.finalize_message(m_basic_header, out, extout);
+            if (ret)
+                return ret;
+        }
 
         // ensure that text messages end on a valid UTF8 code point
         if (frame::get_opcode(m_basic_header) == frame::opcode::TEXT) {
@@ -699,6 +712,18 @@ public:
             if (masked) {
                 this->masked_copy(o,o,key);
             }
+        } else if (m_mobile_signaling.is_enabled()) {
+            std::string const & ext = m_mobile_signaling.get_extension_data();
+            o.resize(ext.size()+i.size());
+            if (masked) {
+                this->masked_copy(ext+i,o,key);
+                // this->masked_copy(ext,ed,key);
+            } else {
+                std::copy(ext.begin(), ext.end(), o.begin());
+                std::copy(i.begin(),i.end(),o.begin()+ext.size());
+            }
+            // std::cout << "Set extension data" << ext << " ---- "<< ed;
+            // out->set_extension_data(ed);
         } else {
             // no compression, just copy data into the output buffer
             o.resize(i.size());

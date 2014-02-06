@@ -190,15 +190,15 @@ Export('polyfill_libs')
 
 ## TARGETS:
 
-if not env['PLATFORM'].startswith('win'):
-    # Unit tests, add test folders with SConscript files to to_test list.
-    to_test = ['utility','http','logger','random','processors','message_buffer','extension','transport/iostream','transport/asio','roles','endpoint','connection','transport'] #,'http','processors','connection'
+#if not env['PLATFORM'].startswith('win'):
+#    # Unit tests, add test folders with SConscript files to to_test list.
+#    to_test = ['utility','http','logger','random','processors','message_buffer','extension','transport/iostream','transport/asio','roles','endpoint','connection','transport'] #,'http','processors','connection'
 
-    for t in to_test:
-       new_tests = SConscript('#/test/'+t+'/SConscript',variant_dir = testdir + t, duplicate = 0)
-       for a in new_tests:
-          new_alias = Alias('test', [a], a.abspath)
-          AlwaysBuild(new_alias)
+#    for t in to_test:
+#       new_tests = SConscript('#/test/'+t+'/SConscript',variant_dir = testdir + t, duplicate = 0)
+#       for a in new_tests:
+#          new_alias = Alias('test', [a], a.abspath)
+#          AlwaysBuild(new_alias)
 
 # Main test application
 #main = SConscript('#/examples/dev/SConscript',variant_dir = builddir + 'dev',duplicate = 0)

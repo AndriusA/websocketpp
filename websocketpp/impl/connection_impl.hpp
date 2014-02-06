@@ -71,6 +71,8 @@ session::state::value connection<config>::get_state() const {
     return m_state;
 }
 
+// #ifndef WEBSOCKETPP_EXTENSION_MOBILE_SIGNALING_CONNECTION
+
 template <typename config>
 lib::error_code connection<config>::send(const std::string& payload,
     frame::opcode::value op)
@@ -80,6 +82,8 @@ lib::error_code connection<config>::send(const std::string& payload,
     msg->set_compressed(true);
     return send(msg);
 }
+
+// #endif // WEBSOCKETPP_EXTENSION_MOBILE_SIGNALING_CONNECTION
 
 template <typename config>
 lib::error_code connection<config>::send(const void* payload, size_t len,
@@ -1567,9 +1571,17 @@ void connection<config>::write_frame() {
     }
 
     std::string const & header = m_current_msg->get_header();
+    // Insert extension data betweent the header and data payload
+    std::string const & extension_payload = m_current_msg->get_extension_data();
+    if (m_alog.static_test(log::alevel::devel)) {
+        m_alog.write(log::alevel::devel,"appending extension payload:"+ extension_payload);
+    }
+    std::cout << "Extension payload" << extension_payload << std::endl;
     std::string const & payload = m_current_msg->get_payload();
 
     m_send_buffer.push_back(transport::buffer(header.c_str(),header.size()));
+    // Insert extension data betweent the header and data payload
+    m_send_buffer.push_back(transport::buffer(extension_payload.c_str(),extension_payload.size()));
     m_send_buffer.push_back(transport::buffer(payload.c_str(),payload.size()));
 
 

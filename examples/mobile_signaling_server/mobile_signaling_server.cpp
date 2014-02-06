@@ -230,13 +230,13 @@ public:
     /// on_message can be called from either connection handler and will reply on either,
     /// With priority given to the primary connection
     void on_message_primary(connection_hdl primary, connection_hdl signaling, server::message_ptr msg) {
-        std::cout << "Message arrived on primary: " << msg->get_payload() << std::endl;
+        std::cout << "Message arrived on primary: " << msg->get_payload() << " ext " << msg->get_extension_data() << std::endl;
         server::message_ptr response = generateResponse(msg);
         send_message_downlink(primary, signaling, response);
     }
 
     void on_message_signaling(connection_hdl primary, connection_hdl signaling, server::message_ptr msg) {
-        std::cout << "Message arrived on signaling: " << msg->get_payload() << std::endl;
+        std::cout << "Message arrived on signaling: " << msg->get_payload() << " ext " << msg->get_extension_data() << std::endl;
         server::message_ptr response = generateResponse(msg);
         send_message_downlink(primary, signaling, response);
     }

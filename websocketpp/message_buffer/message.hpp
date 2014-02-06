@@ -238,6 +238,13 @@ public:
     std::string const & get_extension_data() const {
         return m_extension_data;
     }
+    std::string & get_raw_extension_data() {
+        return m_extension_data;
+    }
+
+    void set_extension_data(std::string const &extension_data) {
+        m_extension_data = extension_data;
+    }
 
     /// Get a reference to the payload string
     /**
@@ -322,7 +329,7 @@ public:
             return false;
         }
     }
-private:
+protected:
     con_msg_man_weak_ptr        m_manager;
     std::string                 m_header;
     std::string                 m_extension_data;

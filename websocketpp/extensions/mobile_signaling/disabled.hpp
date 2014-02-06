@@ -91,6 +91,15 @@ public:
         ret.first = make_error_code(error::disabled);
         return ret;
     }
+
+    std::string get_extension_data() {
+        return "";
+    }
+    lib::error_code finalize_message(frame::basic_header const & header,
+        std::string &out, std::string &extout)
+    {
+        return make_error_code(error::disabled);
+    }
 };
 
 } // namespace mobile_signaling

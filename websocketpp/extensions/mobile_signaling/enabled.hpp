@@ -40,6 +40,24 @@
 #include <string>
 #include <vector>
 
+
+// #ifdef WEBSOCKETPP_EXTENSION_MOBILE_SIGNALING_CONNECTION
+
+// namespace websocketpp {
+// template <typename config>
+// lib::error_code connection<config>::send(const std::string& payload,
+//     frame::opcode::value op)
+// {
+//     message_ptr msg = m_msg_manager->get_message(op,payload.size());
+//     msg->append_payload(payload);
+//     msg->set_compressed(true);
+//     std::cout<<"YAYYYY"<<std::endl;
+//     return send(msg);
+// }
+// }
+
+// #endif WEBSOCKETPP_EXTENSION_MOBILE_SIGNALING_CONNECTION
+
 namespace websocketpp {
 namespace extensions {
 namespace mobile_signaling {    
@@ -261,7 +279,7 @@ public:
     lib::error_code validate_response(http::attribute_list const & response) {
         lib::error_code err;
         http::attribute_list::const_iterator it;
-        bool id, primary, coordinator, destination;
+        bool id = false, primary = false, coordinator = false, destination = false;
         for (it = response.begin(); it != response.end(); ++it) {
             if (it->first == "connection_id") {
                 if (it->second.empty() || id)
@@ -270,26 +288,30 @@ public:
                 else if (false)
                     // Also check if the ID has the correct value...
                     err = make_error_code(error::invalid_attribute_value);
-                else
+                else {
                     id = true;
+                }
             } else if (it->first == "primary" || it->first == "secondary") {
                 if (!it->second.empty() || primary)
                     err = make_error_code(error::invalid_attributes);
-                else
+                else {
                     primary = true;
+                }
             } else if (it->first == "coordinator") {
                 if (it->second.empty() || coordinator)
                     // We need to have a coordinator and there can only be one
                     err = make_error_code(error::invalid_attributes);
-                else
+                else {
                     // TODO: verify the URL maybe?
                     coordinator = true;
+                }
             } else if (it->first == "destination") {
                 if (it->second.empty() || destination)
                     err = make_error_code(error::invalid_attributes);
-                else
+                else {
                     //TODO: verify url?
                     destination = true;
+                }
             } else {
                 // No other attributes are allowed
                 err = make_error_code(error::invalid_attributes);
@@ -306,6 +328,10 @@ public:
 
     lib::error_code process_response(http::attribute_list const & response) {
         lib::error_code err;
+        for (auto it = response.begin(); it != response.end(); ++it) {
+            if (it->first == "connection_id")
+                m_connection_id = it->second;
+        }
         if (err == lib::error_code())
             m_enabled = true;
         return err;
@@ -355,6 +381,22 @@ public:
             std::cout << "generated response" << ret.second << std::endl;
         }
 
+        return ret;
+    }
+
+    std::string const get_extension_data() const {
+        return "";
+        // return m_connection_id;
+    }
+
+    lib::error_code finalize_message(frame::basic_header const & header,
+        std::string &out, std::string &extout)
+    {
+        lib::error_code ret;
+        // uint8_t ext_payload_length = 24;
+        // extout.resize(ext_payload_length);
+        // std::copy(out.begin(), out.begin()+ext_payload_length, extout.begin());
+        // out.erase(0, ext_payload_length);
         return ret;
     }
 
