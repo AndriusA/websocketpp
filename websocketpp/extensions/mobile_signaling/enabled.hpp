@@ -223,9 +223,16 @@ public:
         err_str_pair ret;
         ret.second = "mobile-signaling";
 
+        bool primary = false;
+        std::string con_uri = uri->str();
+        if (!config::coordinator().get_valid() || con_uri.compare(config::destination().str()) == 0) {
+            primary = true;
+        }
+
         http::parameter_list p;
         bool error = req.get_header_as_plist("Sec-WebSocket-Extensions",p);
         std::string con_id = "";
+        std::string client_id = "";
         if (!error) {
             http::parameter_list::const_iterator it;
             err_str_pair neg_ret;
@@ -241,6 +248,15 @@ public:
                 }
             }
         }
+        std::cout << "Found connection id " << con_id << std::endl; 
+        if (primary) {
+            if (con_id.length() == 0)
+                std::cerr << "Something went wrong - no connection_id" << std::endl;
+            else {
+                client_id = base64_decode(con_id);
+                con_id = "";
+            }
+        }
         if (con_id.length() == 0) {
             // Generate connection ID
             frame::uint32_converter conv;
@@ -249,17 +265,18 @@ public:
                 conv.i = m_rng();
                 std::copy(conv.c,conv.c+4,&raw_id[i*4]);
             }
-            con_id = base64_encode(raw_id, 16);
+            std::string temp(raw_id, raw_id + sizeof raw_id / sizeof raw_id[0]);
+            con_id = base64_encode(client_id+temp);
         }
         ret.second += "; connection_id=\"" + con_id + "\"";
 
-        std::string con_uri = uri->str();
+        
 
         // The direct connection will always be the primary one
         // and the secondary one will always and only be from a proxy
         std::cout << "Connection uri: " << con_uri << std::endl;
         std::cout << "Coordinator uri: " << config::destination().str() << std::endl;
-        if (!config::coordinator().get_valid() || con_uri.compare(config::destination().str()) == 0) {
+        if (primary) {
             ret.second += "; primary";
         }
         ret.second += "; coordinator=\"" + config::coordinator().str() + "\"";

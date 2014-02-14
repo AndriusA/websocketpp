@@ -1576,7 +1576,7 @@ void connection<config>::write_frame() {
     if (m_alog.static_test(log::alevel::devel)) {
         m_alog.write(log::alevel::devel,"appending extension payload:"+ extension_payload);
     }
-    std::cout << "Extension payload" << extension_payload << std::endl;
+    // std::cout << "Extension payload" << extension_payload << std::endl;
     std::string const & payload = m_current_msg->get_payload();
 
     m_send_buffer.push_back(transport::buffer(header.c_str(),header.size()));
